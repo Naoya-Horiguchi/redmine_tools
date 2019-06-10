@@ -22,7 +22,10 @@ THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 # TODO: オプションの充実
 
 if [ "$#" -eq 0 ] ; then
-	generate_issue_template
+	mkdir -p $TMPD/new
+	if [ ! "$NO_DOWNLOAD" ] ; then
+		generate_issue_template
+	fi
 	edit_issue new || exit 1
 	create_issue new
 else

@@ -24,8 +24,10 @@ json_add_int() {
 
 __update_ticket() {
 	local file=$1
+	local issueid=$2
 	local subject="$(grep -i ^#\+subject: $file | sed 's|^#+subject: *||i')"
 	local issue="$(grep -i ^#\+issue: $file | sed 's|^#+issue: *||i')"
+	[ ! "$issue" ] && issue=$issueid
 	# project name/id のどちらを与えても project_id が得られる。
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
 	local project_id=$(jq -r ".projects[] | select(.name == \"$project\") | .id" $RM_CONFIG/projects.json)
@@ -59,7 +61,7 @@ __update_ticket() {
 	if [ "$subject" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.subject "$subject" || return 1
 	fi
-	if [ "$issue" ] ; then
+	if [ "$issue" != new ] && [ "$issue" -gt 0 ] ; then
 		json_add_int $TMPD/$issue/upload.json .issue.id $issue || return 1
 	fi
 	if [ "$project_id" ] ; then
@@ -84,7 +86,6 @@ __update_ticket() {
 		json_add_int $TMPD/$issue/upload.json .issue.done_ratio $done_ratio || return 1
 	fi
 	if [ "$estimate" ] ; then
-		echo estimate is $estimate
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
 		cat $TMPD/$issue/upload.json
 	fi
@@ -96,7 +97,7 @@ __update_ticket() {
 create_ticket() {
 	local file=$1
 	local issueid=$2
-	__update_ticket $file || return 1
+	__update_ticket $file $issueid || return 1
 	echo cat $TMPD/$issueid/upload.json
 	cat $TMPD/$issueid/upload.json
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X POST --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
@@ -105,7 +106,7 @@ create_ticket() {
 upload_ticket() {
 	local file=$1
 	local issueid=$2
-	__update_ticket $file || return 1
+	__update_ticket $file $issueid || return 1
 	echo cat $TMPD/$issueid/upload.json
 	cat $TMPD/$issueid/upload.json
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
