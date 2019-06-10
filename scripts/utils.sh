@@ -213,8 +213,11 @@ edit_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	cp $tmpfile $tmpfile.bak
-	# $EDITOR $TMPD/$issueid/legends $tmpfile
-	$EDITOR $tmpfile
+	if [ "$RM_LEGEND" ] ; then
+		$EDITOR $TMPD/$issueid/legends $tmpfile
+	else
+		$EDITOR $tmpfile
+	fi
 	diff -u $tmpfile.bak $tmpfile > $TMPD/$issueid/edit.diff
 	if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
 		echo "no diff, so no need to upload"

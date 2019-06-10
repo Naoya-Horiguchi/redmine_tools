@@ -4,3 +4,4 @@ export RM_CONFIG=
 export RM_FORMAT=markdown
 export EDITOR=
 export INSECURE=
+export RM_LEGEND=
