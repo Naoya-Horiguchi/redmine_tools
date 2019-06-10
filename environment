@@ -2,3 +2,5 @@ export RM_KEY=
 export RM_BASEURL=
 export RM_CONFIG=
 export RM_FORMAT=markdown
+export EDITOR=
+export INSECURE=

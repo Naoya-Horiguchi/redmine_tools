@@ -28,7 +28,7 @@ __update_ticket() {
 	local issue="$(grep -i ^#\+issue: $file | sed 's|^#+issue: *||i')"
 	# project name/id のどちらを与えても project_id が得られる。
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
-	local project_id=$(jq -r ".projects[] | select(.name == \"$project\") | .id" $RM_CONFIG/issue_statuses.json)
+	local project_id=$(jq -r ".projects[] | select(.name == \"$project\") | .id" $RM_CONFIG/projects.json)
 	[ ! "$project_id" ] && project_id=$project
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
 	local tracker_id=$(jq -r ".trackers[] | select(.name == \"$tracker\") | .id" $RM_CONFIG/trackers.json)
@@ -41,8 +41,8 @@ __update_ticket() {
 	[ ! "$priority_id" ] && priority_id=$priority
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
-	local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
-	local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
+	# local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
+	# local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
 	[ ! "$assigned_id" ] && assigned_id=$assigned
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
@@ -55,7 +55,6 @@ __update_ticket() {
     # is_private
     # category_id
     # watcher_user_ids
-
 	echo "{\"issue\": {}}" > $TMPD/$issue/upload.json
 	if [ "$subject" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.subject "$subject" || return 1
@@ -214,7 +213,8 @@ edit_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	cp $tmpfile $tmpfile.bak
-	$EDITOR $TMPD/$issueid/legends $tmpfile
+	# $EDITOR $TMPD/$issueid/legends $tmpfile
+	$EDITOR $tmpfile
 	diff -u $tmpfile.bak $tmpfile > $TMPD/$issueid/edit.diff
 	if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
 		echo "no diff, so no need to upload"
