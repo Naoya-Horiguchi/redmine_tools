@@ -205,6 +205,7 @@ generate_issue_template() {
 	# TODO: 他の関連
 	echo "#+Blocks: " >> $tmpfile
 	echo "#+Precedes: " >> $tmpfile
+	echo "#+Follows: " >> $tmpfile
 	echo "" >> $tmpfile
 	generate_legends >> $TMPD/new/legends
 }
@@ -245,6 +246,14 @@ update_relations() {
 
 		if [ "$newprecedes" ] ; then
 			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_id\": $newblocks, \"relation_type\": \"precedes\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
+		fi
+	done
+
+	grep -i "^+#+follows:" $TMPD/$issueid/edit.diff | while read line ; do
+		local newfollows="$(grep -i ^+#+follows: $TMPD/$issueid/edit.diff | sed 's|^+#+follows: *||i')"
+
+		if [ "$newfollows" ] ; then
+			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newfollows, \"relation_type\": \"follows\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
