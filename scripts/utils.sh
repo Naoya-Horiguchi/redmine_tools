@@ -98,8 +98,10 @@ create_ticket() {
 	local file=$1
 	local issueid=$2
 	__update_ticket $file $issueid || return 1
-	echo cat $TMPD/$issueid/upload.json
-	cat $TMPD/$issueid/upload.json
+	if [ "$VERBOSE" ] ; then
+		echo "json to be uploaded"
+		cat $TMPD/$issueid/upload.json
+	fi
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X POST --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
 }
 
@@ -107,8 +109,10 @@ upload_ticket() {
 	local file=$1
 	local issueid=$2
 	__update_ticket $file $issueid || return 1
-	echo cat $TMPD/$issueid/upload.json
-	cat $TMPD/$issueid/upload.json
+	if [ "$VERBOSE" ] ; then
+		echo "json to be uploaded"
+		cat $TMPD/$issueid/upload.json
+	fi
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
@@ -280,9 +284,9 @@ upload_issue() {
 	local issueid=$1
 	local tmpfile=$TMPD/$issueid/draft.md
 
-echo "upload_ticket"
+	[ "$VERBOSE" ] && echo "upload_ticket"
 	upload_ticket $tmpfile $issueid
-echo "update_relations $issueid"
+	[ "$VERBOSE" ] && echo "update_relations $issueid"
 	update_relations $issueid
 }
 
@@ -292,7 +296,7 @@ create_issue() {
 
 	mkdir -p $TMPD/$issueid
 	create_ticket $tmpfile $issueid
-	echo update_relations $issueid
+	[ "$VERBOSE" ] && echo update_relations $issueid
 }
 
 if [ ! "$RM_BASEURL" ] ; then
