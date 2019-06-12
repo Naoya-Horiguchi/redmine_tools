@@ -33,8 +33,9 @@ else
 		# TODO: 時刻記録
 		mkdir -p $TMPD/$issueid
 		if [ ! "$NO_DOWNLOAD" ] ; then
+			echo "Downloading ..."
 			date --iso-8601=seconds > $TMPD/$issueid/timestamp
-			download_issue $issueid
+			download_issue $issueid || continue
 		fi
 		edit_issue $issueid || continue
 		# TODO: サーバ上の更新比較、必要に応じて警告

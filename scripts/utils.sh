@@ -87,7 +87,6 @@ __update_ticket() {
 	fi
 	if [ "$estimate" ] ; then
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
-		cat $TMPD/$issue/upload.json
 	fi
 	# category
 	# version
@@ -122,21 +121,27 @@ download_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 	local relcsv=$TMPD/$issueid/relations.csv
 
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq .issues[] > $tmpjson
+	# curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq .issues[] > $tmpjson
 	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/$issueid/relations.json?key=$RM_KEY"  | jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' | tr -d \" >  $relcsv
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*"
+	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/${issueid}.json?key=${RM_KEY}&include=journals" | jq .issue > $tmpjson
 	local projectid=$(jq -r .project.id $tmpjson)
 
+	if [ ! "$tmpjson" ] ; then
+		echo "Failed to download data of issue $issueid." >&2
+		return 1
+	fi
+
 	# cat $tmpjson
-	echo "#+Subject: $(jq -r .subject $tmpjson)" > $tmpfile
+	rm $tmpfile
+	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
+	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
+	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
 	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: $(jq -r .project.id $tmpjson)" >> $tmpfile
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
-	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
 	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
 	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
-	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
@@ -219,18 +224,29 @@ edit_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	cp $tmpfile $tmpfile.bak
-	if [ "$RM_LEGEND" ] ; then
-		$EDITOR $TMPD/$issueid/legends $tmpfile
-	else
-		$EDITOR $tmpfile
-	fi
-	diff -u $tmpfile.bak $tmpfile > $TMPD/$issueid/edit.diff
-	if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
-		echo "no diff, so no need to upload"
-		return 1
-	fi
-	# diff の具合によってはキャンセルする機会を与えるべきか?
-	less $TMPD/$issueid/edit.diff
+	while true ; do
+		if [ "$RM_LEGEND" ] ; then
+			$EDITOR $TMPD/$issueid/legends $tmpfile
+		else
+			$EDITOR $tmpfile
+		fi
+		diff -u $tmpfile.bak $tmpfile > $TMPD/$issueid/edit.diff
+		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
+			echo "no diff, so no need to upload"
+			return 1
+		fi
+		cat $TMPD/$issueid/edit.diff
+		echo
+		echo "Your really upload this change? (y: yes, N: no, e: edit again)"
+		read input
+		if [ "$input" == y ] || [ "$input" == Y ] ; then
+			return 0
+		elif [ "$input" == e ] ; then
+			true # go to next loop
+		else
+			return 1 # quit
+		fi
+	done
 }
 
 update_relations() {
