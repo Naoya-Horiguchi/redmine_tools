@@ -35,6 +35,7 @@ __update_ticket() {
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
 	local tracker_id=$(jq -r ".trackers[] | select(.name == \"$tracker\") | .id" $RM_CONFIG/trackers.json)
 	[ ! "$tracker_id" ] && tracker_id=$tracker
+	# TODO: 大文字小文字区別せず
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
 	local status_id=$(jq -r ".issue_statuses[] | select(.name == \"$status\") | .id" $RM_CONFIG/issue_statuses.json)
 	[ ! "$status_id" ] && status_id=$status
@@ -311,8 +312,10 @@ create_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	mkdir -p $TMPD/$issueid
+	[ "$VERBOSE" ] && echo "create_ticket"
 	create_ticket $tmpfile $issueid
 	[ "$VERBOSE" ] && echo update_relations $issueid
+	update_relations $issueid
 }
 
 if [ ! "$RM_BASEURL" ] ; then
