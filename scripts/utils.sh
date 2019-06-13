@@ -166,6 +166,7 @@ download_issue() {
 		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
 	fi
 
+	rm -f $TMPD/$issueid/legends
 	generate_legends >> $TMPD/$issueid/legends
 	generate_version_legends $projectid >> $TMPD/$issueid/legends
 }
@@ -217,6 +218,7 @@ generate_issue_template() {
 	echo "#+Precedes: " >> $tmpfile
 	echo "#+Follows: " >> $tmpfile
 	echo "" >> $tmpfile
+	rm -f $TMPD/new/legends
 	generate_legends >> $TMPD/new/legends
 }
 
