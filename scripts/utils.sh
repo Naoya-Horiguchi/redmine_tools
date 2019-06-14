@@ -54,6 +54,7 @@ __update_ticket() {
 	# format
 	# blocks, follows など、関連に関わる要素
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPD/$issue/body
+	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPD/$issue/note
 
     # is_private
     # category_id
@@ -91,7 +92,12 @@ __update_ticket() {
 	fi
 	# category
 	# version
-	json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
+	if [ -s "$TMPD/$issue/body" ] ; then
+		json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
+	fi
+	if [ -s "$TMPD/$issue/note" ] ; then
+		json_add_text $TMPD/$issue/upload.json .issue.notes "$(cat $TMPD/$issue/note)" || return 1
+	fi
 }
 
 create_ticket() {
@@ -133,7 +139,7 @@ download_issue() {
 	fi
 
 	# cat $tmpjson
-	rm $tmpfile
+	[ -s "$tmpfile" ] && rm $tmpfile
 	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
 	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
 	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
@@ -165,6 +171,7 @@ download_issue() {
 	if [ "$(jq -r .description $tmpjson)" != null ] ; then
 		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
 	fi
+	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $tmpfile
 
 	rm -f $TMPD/$issueid/legends
 	generate_legends >> $TMPD/$issueid/legends
@@ -240,14 +247,14 @@ edit_issue() {
 		fi
 		cat $TMPD/$issueid/edit.diff
 		echo
-		echo "Your really upload this change? (y: yes, N: no, e: edit again)"
+		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
 		read input
 		if [ "$input" == y ] || [ "$input" == Y ] ; then
 			return 0
-		elif [ "$input" == e ] ; then
-			true # go to next loop
+		elif [ "$input" == n ] || [ "$input" == N ] ; then
+			return 1
 		else
-			return 1 # quit
+			true # edit again
 		fi
 	done
 }
