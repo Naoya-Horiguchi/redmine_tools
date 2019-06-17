@@ -1,6 +1,5 @@
 # TODO: conflict check before upload
-# TODO: 設定項目をクリアする方法 (relation は対応済み)
-# TODO: 親子関係など、既存の設置絵のアンセット方法について。
+# DONE: 親子関係など、既存の設定のアンセット方法について。
 #       -> #+Assigned: 行自体が存在しない -> 更新せず
 #       -> #+Assigned: null とする -> unset
 
@@ -44,14 +43,19 @@ __update_ticket() {
 	[ ! "$priority_id" ] && priority_id=$priority
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
+	# TODO: ユーザリストがない場合の対応
 	# local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
 	# local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
 	[ ! "$assigned_id" ] && assigned_id=$assigned
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# category
-    # fixed_version_id
-	# format
+	local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
+	# TODO: input in string format "<project> - <version>" is not supported yet.
+	if [ -s "$RM_CONFIG/versions/${project_id}.json" ] ; then
+		local version_id=$(jq -r ".versions[] | select(.name == \"$status\") | .id" $RM_CONFIG/versions/${project_id}.json)
+	fi
+	[ ! "$version_id" ] && version_id=$version
 	# blocks, follows など、関連に関わる要素
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPD/$issue/body
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPD/$issue/note
@@ -91,7 +95,9 @@ __update_ticket() {
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
 	fi
 	# category
-	# version
+	if [ "$version_id" ] ; then
+		json_add_int $TMPD/$issue/upload.json .issue.fixed_version_id $version_id || return 1
+	fi
 	if [ -s "$TMPD/$issue/body" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
 	fi
@@ -158,9 +164,14 @@ download_issue() {
 		while read line ; do
 			local type=$(echo $line | cut -f2 -d,)
 			if [ "$type" == "blocks" ] ; then
-				echo "#+blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
 			elif [ "$type" == "precedes" ] ; then
-				echo "#+precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+			elif [ "$type" == "relates" ] ; then
+				local relates_to=$(echo $line | cut -f3 -d,)
+				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
+					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				fi
 			else
 				echo "unsupported type $type" >&2
 				exit 1
@@ -210,6 +221,7 @@ generate_issue_template() {
 	echo "#+Subject: subject" > $tmpfile
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: " >> $tmpfile
+	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき
 	echo "#+Tracker: Epic" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
@@ -224,6 +236,7 @@ generate_issue_template() {
 	echo "#+Blocks: " >> $tmpfile
 	echo "#+Precedes: " >> $tmpfile
 	echo "#+Follows: " >> $tmpfile
+	echo "#+Relates: " >> $tmpfile
 	echo "" >> $tmpfile
 	rm -f $TMPD/new/legends
 	generate_legends >> $TMPD/new/legends
