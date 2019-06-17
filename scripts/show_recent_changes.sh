@@ -1,5 +1,6 @@
 # LIMIT
 # INCLUDE_STATUS
+# ASSIGNED
 # PROJECT: project filter
 # TRACKER: tracker filter
 
@@ -15,7 +16,11 @@ if [ "$INCLUDE_STATUS" ] ; then
 	STATUS_OPT="&status_id=$INCLUDE_STATUS"
 fi
 
-curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}&limit=$LIMIT&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $TMPD/.recent_changes
+if [ "$ASSIGNED" ] ; then
+	ASSIGNED_OPT="&assigned_to_id=$ASSIGNED"
+fi
+
+curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}&limit=$LIMIT&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $TMPD/.recent_changes
 
 IFS=$'\t'
 while read id update pjname status subj ; do
