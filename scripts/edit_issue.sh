@@ -14,12 +14,14 @@ THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 
 . $THISDIR/utils.sh
 
-# TODO: 複数の issue を同時に編集する手段
-# TODO: チケット削除
-# TODO: ファイルからの入力
 # TODO: 編集時刻のタイムクロック記録
 # TODO: 新規作成のときと更新のときで必要になる確率が高い凡例が異なるため、順序を変更する.
 # TODO: オプションの充実
+# TODO: 添付の実装
+# TODO: watcher の実装
+# TODO: 複数の issue を同時に編集する手段
+# TODO: チケット削除
+# TODO: ファイルからの入力
 
 if [ "$#" -eq 0 ] ; then
 	mkdir -p $TMPD/new

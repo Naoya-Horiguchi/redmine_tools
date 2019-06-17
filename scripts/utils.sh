@@ -43,6 +43,7 @@ __update_ticket() {
 	[ ! "$priority_id" ] && priority_id=$priority
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
+	# TODO: ユーザリストがない場合の対応
 	# local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
 	# local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
 	[ ! "$assigned_id" ] && assigned_id=$assigned
@@ -220,6 +221,7 @@ generate_issue_template() {
 	echo "#+Subject: subject" > $tmpfile
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: " >> $tmpfile
+	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき
 	echo "#+Tracker: Epic" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
