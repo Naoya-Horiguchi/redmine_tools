@@ -34,12 +34,19 @@ else
 	for issueid in $@ ; do
 		# TODO: 時刻記録
 		mkdir -p $TMPD/$issueid
+		CLOCK_START=$(date --iso-8601=seconds)
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			echo "Downloading ..."
-			date --iso-8601=seconds > $TMPD/$issueid/timestamp
+			echo $CLOCK_START > $TMPD/$issueid/timestamp
 			download_issue $issueid || continue
 		fi
-		edit_issue $issueid || continue
+		echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
+		edit_issue $issueid
+		RET=$?
+		echo "OUT $(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+		if [ "$RET" -ne 0 ] ; then
+			continue
+		fi
 		# TODO: サーバ上の更新比較、必要に応じて警告
 		tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
 		tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
