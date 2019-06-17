@@ -1,6 +1,5 @@
 # TODO: conflict check before upload
-# TODO: 設定項目をクリアする方法 (relation は対応済み)
-# TODO: 親子関係など、既存の設置絵のアンセット方法について。
+# DONE: 親子関係など、既存の設定のアンセット方法について。
 #       -> #+Assigned: 行自体が存在しない -> 更新せず
 #       -> #+Assigned: null とする -> unset
 
@@ -164,9 +163,14 @@ download_issue() {
 		while read line ; do
 			local type=$(echo $line | cut -f2 -d,)
 			if [ "$type" == "blocks" ] ; then
-				echo "#+blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
 			elif [ "$type" == "precedes" ] ; then
-				echo "#+precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+			elif [ "$type" == "relates" ] ; then
+				local relates_to=$(echo $line | cut -f3 -d,)
+				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
+					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				fi
 			else
 				echo "unsupported type $type" >&2
 				exit 1
@@ -230,6 +234,7 @@ generate_issue_template() {
 	echo "#+Blocks: " >> $tmpfile
 	echo "#+Precedes: " >> $tmpfile
 	echo "#+Follows: " >> $tmpfile
+	echo "#+Relates: " >> $tmpfile
 	echo "" >> $tmpfile
 	rm -f $TMPD/new/legends
 	generate_legends >> $TMPD/new/legends
