@@ -5,3 +5,4 @@ export RM_FORMAT=markdown
 export EDITOR=
 export INSECURE=
 export RM_LEGEND=
+export RM_USERLIST=

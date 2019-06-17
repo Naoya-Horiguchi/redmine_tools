@@ -44,9 +44,11 @@ __update_ticket() {
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
 	# TODO: ユーザリストがない場合の対応
-	# local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
-	# local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
-	[ ! "$assigned_id" ] && assigned_id=$assigned
+	if [ "$RM_USERLIST" ] ; then
+		local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
+		local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
+		[ ! "$assigned_id" ] && assigned_id=$assigned
+	fi
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# category
