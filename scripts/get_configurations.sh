@@ -6,7 +6,6 @@ fi
 mkdir -p $RM_CONFIG
 
 # TODO: support pagination (当面は 1 ページ以内に収まる)
-# TODO: version 情報の取得
 
 if ! [ -e "$RM_CONFIG/projects.json" ] || [ "$FORCE_UPDATE" ] ; then
 	curl ${INSECURE:+-k} -s "$RM_BASEURL/projects.json?key=${RM_KEY}&limit=100" > $RM_CONFIG/projects.json

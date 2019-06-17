@@ -50,8 +50,12 @@ __update_ticket() {
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# category
-    # fixed_version_id
-	# format
+	local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
+	# TODO: input in string format "<project> - <version>" is not supported yet.
+	if [ -s "$RM_CONFIG/versions/${project_id}.json" ] ; then
+		local version_id=$(jq -r ".versions[] | select(.name == \"$status\") | .id" $RM_CONFIG/versions/${project_id}.json)
+	fi
+	[ ! "$version_id" ] && version_id=$version
 	# blocks, follows など、関連に関わる要素
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPD/$issue/body
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPD/$issue/note
@@ -91,7 +95,9 @@ __update_ticket() {
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
 	fi
 	# category
-	# version
+	if [ "$version_id" ] ; then
+		json_add_int $TMPD/$issue/upload.json .issue.fixed_version_id $version_id || return 1
+	fi
 	if [ -s "$TMPD/$issue/body" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
 	fi
