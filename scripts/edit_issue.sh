@@ -11,6 +11,7 @@
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
 THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
+LOCALTICKET=
 
 . $THISDIR/utils.sh
 
@@ -22,41 +23,25 @@ THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 # TODO: 複数の issue を同時に編集する手段
 # TODO: チケット削除
 # TODO: ファイルからの入力
+# TODO: oneshot task の定義 (一回編集して終わり、という短期タスクもある)
 
 if [ "$#" -eq 0 ] ; then
-	mkdir -p $TMPD/new
-	if [ ! "$NO_DOWNLOAD" ] ; then
-		generate_issue_template
+	issueid=new
+elif [ "$1" == "-l" ] ; then
+	# TODO: local task (クロック管理等のために、擬似的なタスクを用意する、
+    # 通常タスクは成果物や予定管理、Epic の場合は情報共有のために存在して
+    # いるが、メールチェックや雑用などはクロック記録目的であるので redmine
+    # に登録する必要性がない)
+	LOCALTICKET=true
+	if [ "$2" ] ; then
+		issueid=$2
+	else
+		issueid=LOCAL_$(date +%y%d%m_%H%M%S)
 	fi
-	edit_issue new || exit 1
-	create_issue new
 else
-	for issueid in $@ ; do
-		# TODO: 時刻記録
-		mkdir -p $TMPD/$issueid
-		CLOCK_START=$(date --iso-8601=seconds)
-		if [ ! "$NO_DOWNLOAD" ] ; then
-			echo "Downloading ..."
-			echo $CLOCK_START > $TMPD/$issueid/timestamp
-			download_issue $issueid || continue
-		fi
-		echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
-		edit_issue $issueid
-		RET=$?
-		echo "OUT $(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
-		if [ "$RET" -ne 0 ] ; then
-			continue
-		fi
-		# TODO: サーバ上の更新比較、必要に応じて警告
-		tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
-		tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
-		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
-
-		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
-			upload_issue $issueid
-		else
-			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
-			echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
-		fi
-	done
+	issueid=$1
 fi
+mkdir -p $TMPD/$issueid
+
+prepare_draft_file $issueid || exit 1
+update_issue $issueid || exit 1
