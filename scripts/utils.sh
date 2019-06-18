@@ -376,9 +376,9 @@ prepare_draft_file() {
 update_issue() {
 	local issueid=$1
 
-	echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
+	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
-		edit_issue $issueid || return 1
+		edit_issue $issueid || break
 		if [ "$LOCALTICKET" ] ; then
 			break
 		fi
@@ -410,7 +410,7 @@ update_issue() {
 			break
 		fi
 	done
-	echo "OUT $(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
 
 if [ ! "$RM_BASEURL" ] ; then
