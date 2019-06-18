@@ -268,6 +268,7 @@ edit_issue() {
 			return 1
 		fi
 		cat $TMPD/$issueid/edit.diff
+		[ "$LOCALTICKET" ] && return 0
 		echo
 		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
 		read input
@@ -353,18 +354,22 @@ prepare_draft_file() {
 	local issueid=$1
 
 	CLOCK_START=$(date --iso-8601=seconds)
-	if [ "$issueid" == new ] ; then
+	if [ "$LOCALTICKET" ] ; then
+		if [ ! -s "$TMPD/$issueid/draft.md" ] ; then
+			generate_issue_template || return 1
+			mv $TMPD/new/* $TMPD/$issueid/
+		fi
+	elif [ "$issueid" == new ] ; then
 		if [ ! "$NO_DOWNLOAD" ] ; then
-			generate_issue_template || exit 1
-			echo $CLOCK_START > $TMPD/$issueid/timestamp
+			generate_issue_template || return 1
 		fi
 	else
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			echo "Downloading ..."
-			download_issue $issueid || exit 1
-			echo $CLOCK_START > $TMPD/$issueid/timestamp
+			download_issue $issueid || return 1
 		fi
 	fi
+	echo $CLOCK_START > $TMPD/$issueid/timestamp
 	keep_original_draft $issueid
 }
 
@@ -373,7 +378,10 @@ update_issue() {
 
 	echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
 	while true ; do
-		edit_issue $issueid || exit 1
+		edit_issue $issueid || return 1
+		if [ "$LOCALTICKET" ] ; then
+			break
+		fi
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
