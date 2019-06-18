@@ -378,7 +378,7 @@ update_issue() {
 
 	echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
 	while true ; do
-		edit_issue $issueid || return 1
+		edit_issue $issueid || break
 		if [ "$LOCALTICKET" ] ; then
 			break
 		fi
