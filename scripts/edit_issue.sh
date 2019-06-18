@@ -22,6 +22,10 @@ THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 # TODO: 複数の issue を同時に編集する手段
 # TODO: チケット削除
 # TODO: ファイルからの入力
+# TODO: チケット新規作成時は、成功後に $RM_CONFIG/edit_memo/new を $RM_CONFIG/edit_memo/<newID> にリネームすべき
+# TODO: draft.md のフォーマットの問題等で upload_issue 前のチェックに失敗したとき、再度 edit しなおすべき
+# TODO: oneshot task の定義 (一回編集して終わり、という短期タスクもある)
+# TODO: local task (クロック管理等のために、擬似的なタスクを用意する、通常タスクは成果物や予定管理、Epic の場合は情報共有のために存在しているが、メールチェックや雑用などはクロック記録目的であるので redmine に登録する必要性がない)
 
 if [ "$#" -eq 0 ] ; then
 	mkdir -p $TMPD/new
