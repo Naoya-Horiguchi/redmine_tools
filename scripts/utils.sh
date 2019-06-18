@@ -139,6 +139,7 @@ download_issue() {
 	# curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq .issues[] > $tmpjson
 	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/$issueid/relations.json?key=$RM_KEY"  | jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' | tr -d \" >  $relcsv
 	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/${issueid}.json?key=${RM_KEY}&include=journals" | jq .issue > $tmpjson
+	# TODO: check not found.
 	local projectid=$(jq -r .project.id $tmpjson)
 
 	if [ ! "$tmpjson" ] ; then
@@ -244,11 +245,17 @@ generate_issue_template() {
 	generate_legends >> $TMPD/new/legends
 }
 
-edit_issue() {
+keep_original_draft() {
 	local issueid=$1
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	cp $tmpfile $tmpfile.bak
+}
+
+edit_issue() {
+	local issueid=$1
+	local tmpfile=$TMPD/$issueid/draft.md
+
 	while true ; do
 		if [ "$RM_LEGEND" ] ; then
 			$EDITOR $TMPD/$issueid/legends $tmpfile
@@ -326,9 +333,9 @@ upload_issue() {
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	[ "$VERBOSE" ] && echo "upload_ticket"
-	upload_ticket $tmpfile $issueid
+	upload_ticket $tmpfile $issueid || return 1
 	[ "$VERBOSE" ] && echo "update_relations $issueid"
-	update_relations $issueid
+	update_relations $issueid || return 1
 }
 
 create_issue() {
@@ -337,9 +344,65 @@ create_issue() {
 
 	mkdir -p $TMPD/$issueid
 	[ "$VERBOSE" ] && echo "create_ticket"
-	create_ticket $tmpfile $issueid
+	create_ticket $tmpfile $issueid || return 1
 	[ "$VERBOSE" ] && echo update_relations $issueid
-	update_relations $issueid
+	update_relations $issueid || return 1
+}
+
+prepare_draft_file() {
+	local issueid=$1
+
+	CLOCK_START=$(date --iso-8601=seconds)
+	if [ "$issueid" == new ] ; then
+		if [ ! "$NO_DOWNLOAD" ] ; then
+			generate_issue_template || exit 1
+			echo $CLOCK_START > $TMPD/$issueid/timestamp
+		fi
+	else
+		if [ ! "$NO_DOWNLOAD" ] ; then
+			echo "Downloading ..."
+			download_issue $issueid || exit 1
+			echo $CLOCK_START > $TMPD/$issueid/timestamp
+		fi
+	fi
+	keep_original_draft $issueid
+}
+
+update_issue() {
+	local issueid=$1
+
+	echo "IN $CLOCK_START" >> $TMPD/$issueid/.clock.log
+	while true ; do
+		edit_issue $issueid || exit 1
+		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
+		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
+		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
+
+		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
+			if [ "$issueid" == new ] ; then
+				create_issue $issueid > $TMPD/$issueid/created.json
+				if [ "$?" -eq 0 ] ; then
+					local newid=$(jq -r .issue.id $TMPD/$issueid/created.json)
+					if [ "$newid" ] ; then
+						echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
+						mv $TMPD/$issueid/ $TMPD/$newid/
+						issueid=$newid
+					fi
+					break
+				fi
+			else
+				upload_issue $issueid && break
+			fi
+			echo "create_issue failed, check draft.md and/or network connection."
+			echo "type any key to open editor again."
+			read input
+		else
+			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
+			echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
+			break
+		fi
+	done
+	echo "OUT $(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
 
 if [ ! "$RM_BASEURL" ] ; then
