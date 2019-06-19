@@ -7,16 +7,19 @@ TMPD=$(mktemp -d)
 START=$1
 END=$2
 
-[ ! "$START" ] && START=$(date --date="today 0:00" +%Y/%m/%d)
-[ ! "$END" ] && END=$(date --date="tomorrow 0:00" +%Y/%m/%d)
+[ ! "$START" ] && START="$(date --date="today 0:00" +%Y/%m/%d)"
+[ ! "$END" ] && END="$(date --date="$START 23:59" --iso-8601=seconds)"
 
 echo "Clock during [$START, $END)"
 START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
-echo "Clock during [$START, $END)"
 
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
-	id=$(basename $(dirname $f))
+	dir=$(dirname $f)
+	id=$(basename $dir)
+	subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
+	project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
+
 	sum=0
 	# filter out with file timestamp
 	IFS=$'\n'
@@ -33,6 +36,6 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 		[ ! "${sum[$id]}" ] && sum[$id]=0
 		sum=$[$sum + $tout - $tin]
 	done
-	echo $id,$[sum/60] >> $TMPD/summary
+	echo -e "$id\t$[sum/60]\t$project\t$subject" >> $TMPD/summary
 done
-cat $TMPD/summary | column -t -s , | sort -k2n
+cat $TMPD/summary | column -t -s $'\t' | sort -k2n
