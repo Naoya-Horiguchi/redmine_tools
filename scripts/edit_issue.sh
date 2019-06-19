@@ -10,11 +10,13 @@
 # TMPD=$(mktemp -d)
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
-THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
+REAL_SOURCE=$(readlink -f $BASH_SOURCE)
+THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 LOCALTICKET=
 
 . $THISDIR/utils.sh
 
+# TODO: コマンド体型の構築
 # TODO: 編集時刻のタイムクロック記録
 # TODO: 新規作成のときと更新のときで必要になる確率が高い凡例が異なるため、順序を変更する.
 # TODO: オプションの充実
