@@ -413,6 +413,28 @@ update_issue() {
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
 
+declare -A PJTABLE;
+generate_project_table() {
+	declare -n pjtable=$1
+	local id=
+	local pjname=
+
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".projects[] | [.id, .name] | @tsv" $RM_CONFIG/projects.json) ; do
+		id=$(echo $line | cut -f1)
+		pjname=$(echo $line | cut -f2)
+		pjtable["$id"]="$pjname"
+	done
+	IFS="$ifs"
+}
+
+project_name() {
+	local projectid=$1
+
+	jq -r ".projects[] | select(.id == $projectid) | .name" $RM_CONFIG/projects.json
+}
+
 if [ ! "$RM_BASEURL" ] ; then
 	echo you need setup RM_BASEURL/RM_KEY
 	exit 1

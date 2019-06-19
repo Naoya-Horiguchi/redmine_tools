@@ -1,3 +1,7 @@
+# TODO: クロック時間帯が重複したときに比率配分する。
+# TODO: プロジェクト単位のサマリ表示
+# TODO: ターミナルレベルで可視化
+# TODO: png でなんらかの出力。
 THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 . $THISDIR/utils.sh
 
@@ -14,6 +18,8 @@ echo "Clock during [$START, $END)"
 START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
 
+generate_project_table PJTABLE
+
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	dir=$(dirname $f)
 	id=$(basename $dir)
@@ -26,8 +32,9 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	for line in $(cat $f) ; do
 		cin=$(echo $line | cut -f1 -d' ')
 		cout=$(echo $line | cut -f2 -d' ')
-		tin=$(date -d $cin +%s)
-		tout=$(date -d $cout +%s)
+		tin=$(date -d $cin +%s 2> /dev/null)
+		tout=$(date -d $cout +%s 2> /dev/null)
+		[ ! "$tout" ] && tout=$(date +%s)
 		[ "$tin"  -ge "$END"   ] && continue
 		[ "$tout" -le "$START" ] && continue
 		[ "$tin"  -le "$START" ] && tin=$START
@@ -36,6 +43,6 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 		[ ! "${sum[$id]}" ] && sum[$id]=0
 		sum=$[$sum + $tout - $tin]
 	done
-	echo -e "$id\t$[sum/60]\t$project\t$subject" >> $TMPD/summary
+	echo -e "$id\t$[sum/60]\t${PJTABLE[$project]}\t$subject" >> $TMPD/summary
 done
 cat $TMPD/summary | column -t -s $'\t' | sort -k2n
