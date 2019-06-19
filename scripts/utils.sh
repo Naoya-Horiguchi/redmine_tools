@@ -363,6 +363,11 @@ prepare_draft_file() {
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			generate_issue_template || return 1
 		fi
+	elif [[ "$issueid" =~ LOCAL_ ]] ; then
+		if [ ! -d "$TMPD/$issueid" ] ; then
+			echo "local ticket $issueid not found"
+			return 1
+		fi
 	else
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			echo "Downloading ..."
@@ -379,9 +384,8 @@ update_issue() {
 	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
 		edit_issue $issueid || break
-		if [ "$LOCALTICKET" ] ; then
-			break
-		fi
+		[ "$LOCALTICKET" ] && break
+		[[ "$issueid" =~ LOCAL_ ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"

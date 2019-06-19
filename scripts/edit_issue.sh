@@ -25,20 +25,16 @@ LOCALTICKET=
 # TODO: ファイルからの入力
 # TODO: oneshot task の定義 (一回編集して終わり、という短期タスクもある)
 
-if [ "$#" -eq 0 ] ; then
+if [ "$#" -eq 0 ] ; then # new ticket
 	issueid=new
-elif [ "$1" == "-l" ] ; then
+elif [ "$1" == "-l" ] ; then # new local ticket
 	# TODO: local task (クロック管理等のために、擬似的なタスクを用意する、
     # 通常タスクは成果物や予定管理、Epic の場合は情報共有のために存在して
     # いるが、メールチェックや雑用などはクロック記録目的であるので redmine
     # に登録する必要性がない)
 	LOCALTICKET=true
-	if [ "$2" ] ; then
-		issueid=$2
-	else
-		issueid=LOCAL_$(date +%y%d%m_%H%M%S)
-	fi
-else
+	issueid=LOCAL_$(date +%y%d%m_%H%M%S)
+else # existing ticket, local ticket
 	issueid=$1
 fi
 mkdir -p $TMPD/$issueid
