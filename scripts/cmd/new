@@ -1,0 +1,24 @@
+#!/bin/bash
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-l)
+			LOCALTICKET=true
+			shift 1
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+if [ "$LOCALTICKET" ] ; then
+	ISSUEID="$(generate_local_ticket_id)"
+else
+	ISSUEID=new
+fi
+
+mkdir -p $TMPD/$ISSUEID
+prepare_draft_file $ISSUEID || exit 1
+update_issue $ISSUEID || exit 1

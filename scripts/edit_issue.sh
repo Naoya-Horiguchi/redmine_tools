@@ -2,6 +2,7 @@
 #   - edit_issue.sh             // 新規 issue の生成する
 #   - edit_issue.sh id [...]    // 指定した id の issue を更新する
 #   - edit_issue.sh file [...]  // 指定した file ベースで issue を生成・更新する
+#   - edit_issue.sh open id     // ブラウザで開く
 #
 # Options:
 #   -f: force update (FORCE_UPDATE)

@@ -3,7 +3,7 @@ THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
 
 generate_project_table PJTABLE
 
-find $RM_CONFIG/edit_memo -type d | grep LOCAL | while read line ; do
+find $RM_CONFIG/edit_memo -type d -maxdepth 1 | grep ^memo/L | while read line ; do
 	id=$(basename $line)
 	subject="$(grep -i ^#\+subject: $line/draft.md | sed 's|^#+subject: *||i')"
 	project="$(grep -i ^#\+project: $line/draft.md | sed 's|^#+project: *||i')"

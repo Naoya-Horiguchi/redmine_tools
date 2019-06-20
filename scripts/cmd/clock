@@ -1,13 +1,14 @@
-# TODO: クロック時間帯が重複したときに比率配分する。
-# TODO: プロジェクト単位のサマリ表示
-# TODO: ターミナルレベルで可視化
-# TODO: png でなんらかの出力。
-THISDIR=$(readlink -f $(dirname $BASH_SOURCE))
-. $THISDIR/utils.sh
+#!/bin/bash
 
-TMPD=$(mktemp -d)
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		*)
+			break
+			;;
+	esac
+done
 
-# any format supported by date command (-d option)
 START=$1
 END=$2
 

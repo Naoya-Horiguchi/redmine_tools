@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Usage:
+#   - redmine [global options] <subcmd> [options]
+#
+# Global options (GLOBAL_VARIABLE)
+#   -c config_file  specify config file including set of configurations
+#   -d dir          directory to store config and ticket cache (RM_CONFIG)
+#   -u base_url     base URL of target RedMine server (RM_BASEURL)
+#   -k api_key      API key to access to the RedMine (RM_KEY)
+#   -f format       markup language used by the RedMine (textile or markdown: RM_FORMAT)
+#   -e editor       your text editor (EDITOR)
+#   --insecure      skip verification of the certificate for HTTPS connection (INSECURE)
+#   --legend        open with EDITOR with legend list aside from draft.md (RM_LEGEND)
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+	cat <<EOF
+  Supported subcommands:
+    $(ls -1 $THISDIR/cmd | tr '\n' ' ')
+
+EOF
+}
+
+show_help
+
+# TODO: サブコマンドのヘルプ表示サポート

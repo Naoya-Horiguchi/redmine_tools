@@ -1,0 +1,5 @@
+#!/bin/bash
+
+ISSUEID=$1
+
+open_with_browser $RM_BASEURL/issues/$ISSUEID

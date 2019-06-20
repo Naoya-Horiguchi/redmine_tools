@@ -8,8 +8,8 @@ json_add_text() {
 	local position="$2"
 	local text="$3"
 
-	cp $file $TMPD/tmp.json
-	jq --arg text "$text" $position='$text' $TMPD/tmp.json > $file
+	cp $file $RM_CONFIG/tmp.json
+	jq --arg text "$text" $position='$text' $RM_CONFIG/tmp.json > $file
 }
 
 json_add_int() {
@@ -17,8 +17,8 @@ json_add_int() {
 	local position="$2"
 	local int="$3"
 
-	cp $file $TMPD/tmp.json
-	jq $position=$int $TMPD/tmp.json > $file
+	cp $file $RM_CONFIG/tmp.json
+	jq $position=$int $RM_CONFIG/tmp.json > $file
 }
 
 __update_ticket() {
@@ -384,7 +384,7 @@ prepare_draft_file() {
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			generate_issue_template || return 1
 		fi
-	elif [[ "$issueid" =~ LOCAL_ ]] ; then
+	elif [[ "$issueid" =~ ^L ]] ; then
 		if [ ! -d "$TMPD/$issueid" ] ; then
 			echo "local ticket $issueid not found"
 			return 1
@@ -406,7 +406,7 @@ update_issue() {
 	while true ; do
 		edit_issue $issueid || break
 		[ "$LOCALTICKET" ] && break
-		[[ "$issueid" =~ LOCAL_ ]] && break
+		[[ "$issueid" =~ ^L ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
@@ -458,6 +458,47 @@ project_name() {
 	local projectid=$1
 
 	jq -r ".projects[] | select(.id == $projectid) | .name" $RM_CONFIG/projects.json
+}
+
+open_with_browser() {
+	local url="$1"
+
+	if [ -n $BROWSER ]; then
+		$BROWSER "$url"
+	elif which xdg-open > /dev/null; then
+		xdg-open "$url"
+	elif which gnome-open > /dev/null; then
+		gnome-open "$url"
+	else
+		echo "Could not detect the web browser to use."
+	fi
+}
+
+generate_local_ticket_id() {
+	# Assuming that local ticket ID is format like "L3" or "L70"
+	local id="$(ls -1 $RM_CONFIG/edit_memo | grep ^L | sort -t L -k2n | tail -n1 | cut -f2 -dL)"
+
+	if [ "$id" ] ; then
+		echo -n "L$[id + 1]"
+	else
+		echo "L1"
+	fi
+}
+
+check_ticket_id_format() {
+	local issueid=$1
+
+	if [[ "$issueid" =~ ^[0-9]+$ ]] ; then
+		return 0
+	elif [[ "$issueid" =~ ^L[0-9]+$ ]] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+get_local_ticket_list() {
+	ls -1 $RM_CONFIG/edit_memo | grep ^L
 }
 
 if [ ! "$RM_BASEURL" ] ; then

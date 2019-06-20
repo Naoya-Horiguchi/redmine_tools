@@ -1,0 +1,70 @@
+#!/bin/bash
+
+LIMIT=25
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-n)
+			LIMIT="$2"
+			shift 2
+			;;
+		-a)
+			ASSIGNED="$2"
+			shift 2
+			;;
+		-c)
+			INCLUDE_CLOSED=true
+			shift
+			;;
+		-l)
+			INCLUDE_LOCAL=true
+			shift
+			;;
+		*)
+			# echo "invalid option $key"
+			break
+			;;
+	esac
+done
+
+if [ "$INCLUDE_CLOSED" ] ; then
+	echo "include closed tickets"
+	STATUS_OPT="&status_id=*"
+fi
+
+rm $RM_CONFIG/tmp.local_ticket_list 2> /dev/null
+if [ "$INCLUDE_LOCAL" ] ; then
+	generate_project_table PJTABLE
+	for ltck in $(get_local_ticket_list) ; do
+		latest_clockout="$(tail -n1 $RM_CONFIG/edit_memo/$ltck/.clock.log | cut -f2 -d' ')"
+		latest_clockout="$(date -d $latest_clockout +%y%m%d_%H%M)"
+		subject="$(grep -i ^#\+subject: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+subject: *||i')"
+		project="$(grep -i ^#\+project: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+project: *||i')"
+		status="$(grep -i ^#\+status: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+status: *||i')"
+		echo -e "$ltck\t${latest_clockout}\t${PJTABLE[$project]}\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
+	done
+fi
+
+if [ "$ASSIGNED" ] ; then
+	ASSIGNED_OPT="&assigned_to_id=$ASSIGNED"
+fi
+
+if [ "$LIMIT" ] ; then
+	LIMIT_OPT="&limit=$LIMIT"
+fi
+
+# echo curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&sort=updated_on:desc"
+
+curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $RM_CONFIG/tmp.ticket_list
+
+IFS=$'\t'
+while read id update pjname status subj ; do
+	echo -e "$id\t$(date -d $update +%y%m%d_%H%M)\t$pjname\t$status\t$subj"
+done < "$RM_CONFIG/tmp.ticket_list" > $RM_CONFIG/tmp.remote_ticket_list
+
+if [ "$INCLUDE_LOCAL" ] ; then
+	cat $RM_CONFIG/tmp.remote_ticket_list $RM_CONFIG/tmp.local_ticket_list | sort -k2 | column -t -s $'\t' | tail -n $LIMIT
+else
+	cat $RM_CONFIG/tmp.remote_ticket_list | sort -k2 | column -t -s $'\t'
+fi
+

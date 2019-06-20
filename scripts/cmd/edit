@@ -1,0 +1,30 @@
+#!/bin/bash
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-n)
+			NO_DOWNLOAD=true
+			shift 1
+			;;
+		-f)
+			FORCE_UPDATE=true
+			shift 1
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+ISSUEID=$1
+
+
+if ! check_ticket_id_format $ISSUEID ; then
+	echo "invalid issueid format" >&2
+	exit 1
+fi
+
+mkdir -p $TMPD/$ISSUEID
+prepare_draft_file $ISSUEID || exit 1
+update_issue $ISSUEID || exit 1
