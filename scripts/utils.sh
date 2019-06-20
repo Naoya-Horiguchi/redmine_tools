@@ -310,6 +310,14 @@ update_relations() {
 		fi
 	done
 
+	grep -i "^+#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
+		local newrelates="$(grep -i ^+#+relates: $TMPD/$issueid/edit.diff | sed 's|^+#+relates: *||i')"
+
+		if [ "$newrelates" ] ; then
+			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newrelates, \"relation_type\": \"relates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
+		fi
+	done
+
 	grep -i "^-#+blocks:" $TMPD/$issueid/edit.diff | while read line ; do
 		local oldblocks="$(grep -i ^-#+blocks: $TMPD/$issueid/edit.diff | sed 's|^-#+blocks: *||i')"
 		local relid=$(grep $issueid,blocks,$oldblocks $relcsv | cut -f4 -d,)
@@ -322,6 +330,19 @@ update_relations() {
 	grep -i "^-#+precedes:" $TMPD/$issueid/edit.diff | while read line ; do
 		local oldprecedes="$(grep -i ^-#+precedes: $TMPD/$issueid/edit.diff | sed 's|^-#+precedes: *||i')"
 		local relid=$(grep $oldprecedes,precedes,$issueid $relcsv | cut -f4 -d,)
+
+		if [ "$relid" ] ; then
+			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
+		fi
+	done
+
+	grep -i "^-#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
+		local oldrelates="$(grep -i ^-#+relates: $TMPD/$issueid/edit.diff | sed 's|^-#+relates: *||i')"
+		if [ "$oldrelates" -gt "$issueid" ] ; then
+			local relid=$(grep $issueid,relates,$oldrelates $relcsv | cut -f4 -d,)
+		else
+			local relid=$(grep $oldrelates,relates,$issueid $relcsv | cut -f4 -d,)
+		fi
 
 		if [ "$relid" ] ; then
 			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
