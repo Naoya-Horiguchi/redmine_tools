@@ -23,6 +23,8 @@ show_help() {
 EOF
 }
 
-show_help
-
-# TODO: サブコマンドのヘルプ表示サポート
+if [ "$1" ] ; then
+	awk '/^$/ {gate = 1} {if (gate == 0) print $0}' $THISDIR/cmd/$1 | sed -n "2,\$p" | sed 's/^#/ /'
+else
+	show_help
+fi

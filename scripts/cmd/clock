@@ -1,8 +1,25 @@
 #!/bin/bash
+#
+# Usage
+#   redmine clock [options] [start_date] [end_date]
+#
+# Description
+#
+# Options
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
 
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
 		*)
 			break
 			;;

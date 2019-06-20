@@ -1,4 +1,30 @@
 #!/bin/bash
+#
+# Usage
+#   redmine open [options] [ticket_id]
+#
+# Description
+#
+# Options
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
 
 ISSUEID=$1
 

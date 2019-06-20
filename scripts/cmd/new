@@ -1,4 +1,18 @@
 #!/bin/bash
+#
+# Usage
+#   redmine new [options]
+#
+# Description
+#
+# Options
+#   -l            create local ticket
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
 
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -6,6 +20,10 @@ while [[ $# -gt 0 ]] ; do
 		-l)
 			LOCALTICKET=true
 			shift 1
+			;;
+		-h)
+			show_help
+			exit 0
 			;;
 		*)
 			break

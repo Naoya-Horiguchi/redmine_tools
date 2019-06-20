@@ -463,7 +463,7 @@ project_name() {
 open_with_browser() {
 	local url="$1"
 
-	if [ -n $BROWSER ]; then
+	if [ "$BROWSER" ]; then
 		$BROWSER "$url"
 	elif which xdg-open > /dev/null; then
 		xdg-open "$url"

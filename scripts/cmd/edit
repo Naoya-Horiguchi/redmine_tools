@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+# Usage
+#   redmine edit [options] <ticket_id>
+#
+# Description
+#
+# Options
+#   -f            force update (upload draft.md even if there's update on server: FORCE_UPDATE)
+#   -n            no download and edit with local cache (NO_DOWNLOAD)
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
 
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -10,6 +25,10 @@ while [[ $# -gt 0 ]] ; do
 		-f)
 			FORCE_UPDATE=true
 			shift 1
+			;;
+		-h)
+			show_help
+			exit 0
 			;;
 		*)
 			break

@@ -37,6 +37,8 @@
 #
 #   help <subcommand>
 #
+#   update [options]                         # get some info (like projects, versions
+#                                            # users) to local cache
 #
 # Planned features:
 #   - convert local ticket to RedMine ticket (and vice versa)
@@ -50,6 +52,10 @@
 #   - status change if done_ratio is changed
 #   - create sub-ticket or related ticket from a given ticket
 #   - notify if the ticket is already open
+#   - show message about added clocks
+#   - add mode in which opened ticket list or ticket with browser
+#   - show figures in description with attachment url
+#   - sanitize invalid ticket status
 #
 
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
@@ -111,14 +117,3 @@ if [ ! -e "$THISDIR/cmd/$SUBCMD" ] ; then
 fi
 
 . $THISDIR/cmd/$SUBCMD
-
-# TODO: コマンド体型の構築
-# TODO: 編集時刻のタイムクロック記録
-# TODO: 新規作成のときと更新のときで必要になる確率が高い凡例が異なるため、順序を変更する.
-# TODO: オプションの充実
-# TODO: 添付の実装
-# TODO: watcher の実装
-# TODO: 複数の issue を同時に編集する手段
-# TODO: チケット削除
-# TODO: ファイルからの入力
-# TODO: oneshot task の定義 (一回編集して終わり、という短期タスクもある)

@@ -1,4 +1,21 @@
 #!/bin/bash
+#
+# Usage
+#   redmine list [options]
+#
+# Description
+#
+# Options
+#   -n limit      number of ticket to list (default: 25)
+#   -a user_id    filter ticket with given user (user ID or "me")
+#   -c            include closed tickets
+#   -l            include local tickets
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
 
 LIMIT=25
 while [[ $# -gt 0 ]] ; do
@@ -20,6 +37,10 @@ while [[ $# -gt 0 ]] ; do
 			INCLUDE_LOCAL=true
 			shift
 			;;
+		-h)
+			show_help
+			exit 0
+			;;
 		*)
 			# echo "invalid option $key"
 			break
@@ -40,8 +61,14 @@ if [ "$INCLUDE_LOCAL" ] ; then
 		latest_clockout="$(date -d $latest_clockout +%y%m%d_%H%M)"
 		subject="$(grep -i ^#\+subject: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+subject: *||i')"
 		project="$(grep -i ^#\+project: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+project: *||i')"
+		if [ ! "$project" ] ; then
+			projet=null
+		else
+			eproject=${PJTABLE[$project]}
+		fi
 		status="$(grep -i ^#\+status: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+status: *||i')"
-		echo -e "$ltck\t${latest_clockout}\t${PJTABLE[$project]}\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
+		[ ! "$status" ] && status=null
+		echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
 	done
 fi
 
@@ -67,4 +94,3 @@ if [ "$INCLUDE_LOCAL" ] ; then
 else
 	cat $RM_CONFIG/tmp.remote_ticket_list | sort -k2 | column -t -s $'\t'
 fi
-
