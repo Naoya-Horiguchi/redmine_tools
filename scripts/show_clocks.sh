@@ -20,6 +20,7 @@ END=$(date --date="$END" +%s)
 
 generate_project_table PJTABLE
 
+rm $RM_CONFIG/tmp.clock_summary 2> /dev/null
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	dir=$(dirname $f)
 	id=$(basename $dir)
@@ -43,6 +44,6 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 		[ ! "${sum[$id]}" ] && sum[$id]=0
 		sum=$[$sum + $tout - $tin]
 	done
-	echo -e "$id\t$[sum/60]\t${PJTABLE[$project]}\t$subject" >> $TMPD/summary
+	echo -e "$id\t$[sum/60]\t${PJTABLE[$project]}\t$subject" >> $RM_CONFIG/tmp.clock_summary
 done
-cat $TMPD/summary | column -t -s $'\t' | sort -k2n
+cat $RM_CONFIG/tmp.clock_summary | column -t -s $'\t' | sort -k2n

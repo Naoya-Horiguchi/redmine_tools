@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# Usage
+#   redmine clock [options] [start_date] [end_date]
+#
+# Description
+#
+# Options
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+START=$1
+END=$2
+
+[ ! "$START" ] && START="$(date --date="today 0:00" +%Y/%m/%d)"
+[ ! "$END" ] && END="$(date --date="$START 23:59" --iso-8601=seconds)"
+
+echo "Clock during [$START, $END)"
+START=$(date --date="$START" +%s)
+END=$(date --date="$END" +%s)
+
+generate_project_table PJTABLE
+declare -A clock_per_project
+
+totalclock=0
+rm $RM_CONFIG/tmp.clock_summary 2> /dev/null
+for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
+	dir=$(dirname $f)
+	id=$(basename $dir)
+	subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
+	project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
+	if [ ! "$project" ] ; then
+		project=null
+	else
+		project=${PJTABLE[$project]}
+	fi
+
+	sum=0
+	# filter out with file timestamp
+	IFS=$'\n'
+	for line in $(cat $f) ; do
+		cin=$(echo $line | cut -f1 -d' ')
+		cout=$(echo $line | cut -f2 -d' ')
+		tin=$(date -d $cin +%s 2> /dev/null)
+		tout=$(date -d $cout +%s 2> /dev/null)
+		[ ! "$tout" ] && tout=$(date +%s)
+		[ "$tin"  -ge "$END"   ] && continue
+		[ "$tout" -le "$START" ] && continue
+		[ "$tin"  -le "$START" ] && tin=$START
+		[ "$tout" -ge "$END"   ] && tout=$END
+
+		[ ! "${sum[$id]}" ] && sum[$id]=0
+		sum=$[$sum + $tout - $tin]
+	done
+	[ "$sum" -eq 0 ] && continue
+	totalclock=$[totalclock + sum]
+	[ ! "${clock_per_project["$project"]}" ] && clock_per_project["$project"]=0
+	clock_per_project["$project"]=$[clock_per_project["$project"]+$sum]
+	if [ "$[sum/60]" -gt 0 ] ; then
+		echo -e "$id\t$[sum/60]\t$project\t$subject" >> $RM_CONFIG/tmp.clock_summary
+	fi
+done
+
+TMPF=$(mktemp)
+
+rm -f $RM_CONFIG/tmp.proj_clock_summary
+for proj in ${!clock_per_project[@]} ; do
+	[ "${clock_per_project[$proj]}" -lt 60 ] && continue
+	echo -e " \t$[${clock_per_project[$proj]}/60]\t$proj" >> $RM_CONFIG/tmp.proj_clock_summary
+done
+cp $RM_CONFIG/tmp.proj_clock_summary $TMPF
+sort -k1n $TMPF > $RM_CONFIG/tmp.proj_clock_summary
+
+cp $RM_CONFIG/tmp.clock_summary $TMPF
+sort -k2n $TMPF > $RM_CONFIG/tmp.clock_summary
+
+if [ -s "$RM_CONFIG/tmp.clock_summary" ] ; then
+	(
+		cat $RM_CONFIG/tmp.clock_summary # | column -t -s $'\t' | sort -k2n
+		echo -e "---\t---\t---\t---"
+		cat $RM_CONFIG/tmp.proj_clock_summary # | column -t -s $'\t' | sort -k2n
+		echo -e "---\t---\t---\t---"
+		echo -e " \t$[totalclock/60]\ttotal\t "
+	) | column -t -s $'\t'
+fi

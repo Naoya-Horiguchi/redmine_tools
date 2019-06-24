@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Usage
+#   redmine show [options] <ticket_id>
+#
+# Description
+#
+# Options
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+ISSUEID=$1
+
+if ! check_ticket_id_format $ISSUEID ; then
+	echo "invalid issueid format" >&2
+	exit 1
+fi
+
+# TODO: better file name
+tmpjson=$TMPD/$ISSUEID/issue2.json
+tmpfile=$TMPD/$ISSUEID/draft2.md
+relcsv=$TMPD/$ISSUEID/relations2.csv
+
+fetch_issue "$ISSUEID" "$relcsv" "$tmpjson" || exit 1
+__format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || exit 1
+cat $tmpfile

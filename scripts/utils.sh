@@ -8,8 +8,8 @@ json_add_text() {
 	local position="$2"
 	local text="$3"
 
-	cp $file $TMPD/tmp.json
-	jq --arg text "$text" $position='$text' $TMPD/tmp.json > $file
+	cp $file $RM_CONFIG/tmp.json
+	jq --arg text "$text" $position='$text' $RM_CONFIG/tmp.json > $file
 }
 
 json_add_int() {
@@ -17,8 +17,8 @@ json_add_int() {
 	local position="$2"
 	local int="$3"
 
-	cp $file $TMPD/tmp.json
-	jq $position=$int $TMPD/tmp.json > $file
+	cp $file $RM_CONFIG/tmp.json
+	jq $position=$int $RM_CONFIG/tmp.json > $file
 }
 
 __update_ticket() {
@@ -130,22 +130,88 @@ upload_ticket() {
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
+__curl() {
+	local api="$1"
+	local out="$2"
+	local tmpf=$(mktemp)
+	local data="$3"
+
+	[ ! "$out" ] && echo "invalid input" && return 1
+	curl ${INSECURE:+-k} -s "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" > $tmpf || return 1
+	if [ -s "$tmpf" ] ; then
+		mkdir -p $(dirname $out)
+		mv $tmpf $out
+	else
+		return 1
+	fi
+}
+
+fetch_issue() {
+	local issueid="$1"
+	local relcsv="$2"
+	local tmpjson="$3"
+	local tmpf=$RM_CONFIG/tmp.tmp
+
+	__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
+	jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' /tmp/32 | tr -d \" > $relcsv
+
+	__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
+	jq -r .issue /tmp/37 > $tmpjson
+}
+
+__format_to_draft() {
+	local tmpjson="$1"
+	local tmpfile="$2"
+	local relcsv="$3"
+
+	# cat $tmpjson
+	[ -s "$tmpfile" ] && rm $tmpfile
+	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
+	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
+	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
+	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
+	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
+	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
+	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
+	echo "#+ParentIssue: $(jq -r .parent.name $tmpjson)" >> $tmpfile
+	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
+	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
+	echo "#+Version: $(jq -r .fixed_version.name $tmpjson)" >> $tmpfile
+	echo "#+Format: $RM_FORMAT" >> $tmpfile
+
+	if [ -s "$relcsv" ] ; then
+		while read line ; do
+			local type=$(echo $line | cut -f2 -d,)
+			if [ "$type" == "blocks" ] ; then
+				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
+			elif [ "$type" == "precedes" ] ; then
+				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+			elif [ "$type" == "relates" ] ; then
+				local relates_to=$(echo $line | cut -f3 -d,)
+				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
+					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				fi
+			else
+				echo "unsupported type $type" >&2
+				exit 1
+			fi
+		done<$relcsv
+	fi
+	# TODO: support due_date
+	if [ "$(jq -r .description $tmpjson)" != null ] ; then
+		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
+	fi
+}
+
 download_issue() {
 	local issueid=$1
 	local tmpjson=$TMPD/$issueid/issue.json
 	local tmpfile=$TMPD/$issueid/draft.md
 	local relcsv=$TMPD/$issueid/relations.csv
 
-	# curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq .issues[] > $tmpjson
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/$issueid/relations.json?key=$RM_KEY"  | jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' | tr -d \" >  $relcsv
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/${issueid}.json?key=${RM_KEY}&include=journals" | jq .issue > $tmpjson
-	# TODO: check not found.
+	fetch_issue "$issueid" "$relcsv" "$tmpjson" || return 1
 	local projectid=$(jq -r .project.id $tmpjson)
-
-	if [ ! "$tmpjson" ] ; then
-		echo "Failed to download data of issue $issueid." >&2
-		return 1
-	fi
 
 	# cat $tmpjson
 	[ -s "$tmpfile" ] && rm $tmpfile
@@ -310,6 +376,14 @@ update_relations() {
 		fi
 	done
 
+	grep -i "^+#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
+		local newrelates="$(grep -i ^+#+relates: $TMPD/$issueid/edit.diff | sed 's|^+#+relates: *||i')"
+
+		if [ "$newrelates" ] ; then
+			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newrelates, \"relation_type\": \"relates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
+		fi
+	done
+
 	grep -i "^-#+blocks:" $TMPD/$issueid/edit.diff | while read line ; do
 		local oldblocks="$(grep -i ^-#+blocks: $TMPD/$issueid/edit.diff | sed 's|^-#+blocks: *||i')"
 		local relid=$(grep $issueid,blocks,$oldblocks $relcsv | cut -f4 -d,)
@@ -322,6 +396,19 @@ update_relations() {
 	grep -i "^-#+precedes:" $TMPD/$issueid/edit.diff | while read line ; do
 		local oldprecedes="$(grep -i ^-#+precedes: $TMPD/$issueid/edit.diff | sed 's|^-#+precedes: *||i')"
 		local relid=$(grep $oldprecedes,precedes,$issueid $relcsv | cut -f4 -d,)
+
+		if [ "$relid" ] ; then
+			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
+		fi
+	done
+
+	grep -i "^-#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
+		local oldrelates="$(grep -i ^-#+relates: $TMPD/$issueid/edit.diff | sed 's|^-#+relates: *||i')"
+		if [ "$oldrelates" -gt "$issueid" ] ; then
+			local relid=$(grep $issueid,relates,$oldrelates $relcsv | cut -f4 -d,)
+		else
+			local relid=$(grep $oldrelates,relates,$issueid $relcsv | cut -f4 -d,)
+		fi
 
 		if [ "$relid" ] ; then
 			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
@@ -363,7 +450,7 @@ prepare_draft_file() {
 		if [ ! "$NO_DOWNLOAD" ] ; then
 			generate_issue_template || return 1
 		fi
-	elif [[ "$issueid" =~ LOCAL_ ]] ; then
+	elif [[ "$issueid" =~ ^L ]] ; then
 		if [ ! -d "$TMPD/$issueid" ] ; then
 			echo "local ticket $issueid not found"
 			return 1
@@ -385,7 +472,7 @@ update_issue() {
 	while true ; do
 		edit_issue $issueid || break
 		[ "$LOCALTICKET" ] && break
-		[[ "$issueid" =~ LOCAL_ ]] && break
+		[[ "$issueid" =~ ^L ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
@@ -437,6 +524,48 @@ project_name() {
 	local projectid=$1
 
 	jq -r ".projects[] | select(.id == $projectid) | .name" $RM_CONFIG/projects.json
+}
+
+open_with_browser() {
+	local url="$1"
+
+	if [ "$BROWSER" ]; then
+		$BROWSER "$url"
+	elif which xdg-open > /dev/null; then
+		xdg-open "$url"
+	elif which gnome-open > /dev/null; then
+		gnome-open "$url"
+	else
+		echo "Could not detect the web browser to use. Manually copy the following URL:"
+		echo $url
+	fi
+}
+
+generate_local_ticket_id() {
+	# Assuming that local ticket ID is format like "L3" or "L70"
+	local id="$(ls -1 $RM_CONFIG/edit_memo | grep ^L | sort -t L -k2n | tail -n1 | cut -f2 -dL)"
+
+	if [ "$id" ] ; then
+		echo -n "L$[id + 1]"
+	else
+		echo "L1"
+	fi
+}
+
+check_ticket_id_format() {
+	local issueid=$1
+
+	if [[ "$issueid" =~ ^[0-9]+$ ]] ; then
+		return 0
+	elif [[ "$issueid" =~ ^L[0-9]+$ ]] ; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+get_local_ticket_list() {
+	ls -1 $RM_CONFIG/edit_memo | grep ^L
 }
 
 if [ ! "$RM_BASEURL" ] ; then
