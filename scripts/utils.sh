@@ -498,6 +498,7 @@ update_issue() {
 		else
 			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
 			echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
+			echo "BE CAREFUL!! if you forget to add -f option on next call, draft file will be downloaded again and your local change will be overwritten."
 			break
 		fi
 	done
