@@ -1,8 +1,26 @@
-export RM_KEY=
+# Base URL of your RedMine server
 export RM_BASEURL=
+
+# API Key of your account on RedMine server
+export RM_KEY=
+
+# Base directory to store all cache/config/temporary files. If you use local
+# ticket, this directory should be kept being backed up. So be careful.
 export RM_CONFIG=
+
+# RedMine server might support textile format or markdown format now.
 export RM_FORMAT=markdown
+
+# Set your favorit editor :)
 export EDITOR=
+
+# If you fail to connect to RedMine server by certificate issue, one option
+# is to call curl command with insecure option.
 export INSECURE=
+
+# If you like to open draft file with legend of some RedMine specific meta
+# data (like project name/ID list, version name/ID list ...), enable it.
 export RM_LEGEND=
+
+# TBD
 export RM_USERLIST=

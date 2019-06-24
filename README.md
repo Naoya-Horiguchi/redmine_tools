@@ -73,8 +73,8 @@ L9   259  private_project    private task
 引数が 2 つの場合は指定した期間のクロックを表示する。
 ~~~
 $ redmine clock                         // 今日のクロックの表示
-$ redmine clock 2019/06/20
-$ redmine clock 06/20 06/23
+$ redmine clock 2019/06/20              // 指定した日のクロックを表示
+$ redmine clock 06/20 06/23             // 指定した期間のクロックを表示
 $ redmine clock "a week ago" "today"    // date コマンドの -d オプションが認識する方法で入力可能
 ~~~
 
