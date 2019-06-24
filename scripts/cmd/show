@@ -9,6 +9,8 @@
 #   -h            show this message
 #
 
+# TODO: support local ticket
+
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
