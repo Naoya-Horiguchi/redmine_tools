@@ -57,9 +57,9 @@ redmine new/edit でチケットを編集している間、開始時間と終了
 ~~~
 $ redmine clock
 Clock during [2019/06/24, 2019-06-24T23:59:00+09:00)
-246  1    project A          既存のテストツールで pmem の動作をどう検証しているか調査
-241  13   project A          実機評価の計画作成
-276  94   project A          メモリモードで persistency が必要なのかという観点でコミュニティ動向をチェック
+246  1    project A          Task A-1
+241  13   project A          Task A-2
+276  94   project A          Task A-3
 L9   259  private_project    private task
 ---  ---  ---                ---
      109  project A          // プロジェクトごとのクロック
@@ -73,8 +73,8 @@ L9   259  private_project    private task
 引数が 2 つの場合は指定した期間のクロックを表示する。
 ~~~
 $ redmine clock                         // 今日のクロックの表示
-$ redmine clock 2019/06/20
-$ redmine clock 06/20 06/23
+$ redmine clock 2019/06/20              // 指定した日のクロックを表示
+$ redmine clock 06/20 06/23             // 指定した期間のクロックを表示
 $ redmine clock "a week ago" "today"    // date コマンドの -d オプションが認識する方法で入力可能
 ~~~
 
