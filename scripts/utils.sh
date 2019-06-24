@@ -152,11 +152,15 @@ fetch_issue() {
 	local tmpjson="$3"
 	local tmpf=$RM_CONFIG/tmp.tmp
 
-	__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
-	jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' /tmp/32 | tr -d \" > $relcsv
+	if [ "$relcsv" ] ; then
+		__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
+		jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' /tmp/32 | tr -d \" > $relcsv
+	fi
 
-	__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
-	jq -r .issue /tmp/37 > $tmpjson
+	if [ "$tmpjson" ] ; then
+		__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
+		jq -r .issue /tmp/37 > $tmpjson
+	fi
 }
 
 __format_to_draft() {
@@ -179,8 +183,7 @@ __format_to_draft() {
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Version: $(jq -r .fixed_version.name $tmpjson)" >> $tmpfile
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
-
-	if [ -s "$relcsv" ] ; then
+	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
 		while read line ; do
 			local type=$(echo $line | cut -f2 -d,)
 			if [ "$type" == "blocks" ] ; then
@@ -211,48 +214,9 @@ download_issue() {
 	local relcsv=$TMPD/$issueid/relations.csv
 
 	fetch_issue "$issueid" "$relcsv" "$tmpjson" || return 1
-	local projectid=$(jq -r .project.id $tmpjson)
-
-	# cat $tmpjson
-	[ -s "$tmpfile" ] && rm $tmpfile
-	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
-	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
-	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
-	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
-	echo "#+Project: $(jq -r .project.id $tmpjson)" >> $tmpfile
-	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
-	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
-	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
-	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
-	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
-	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Format: $RM_FORMAT" >> $tmpfile
-
-	if [ -s "$relcsv" ] ; then
-		while read line ; do
-			local type=$(echo $line | cut -f2 -d,)
-			if [ "$type" == "blocks" ] ; then
-				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
-			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
-			elif [ "$type" == "relates" ] ; then
-				local relates_to=$(echo $line | cut -f3 -d,)
-				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
-				fi
-			else
-				echo "unsupported type $type" >&2
-				exit 1
-			fi
-		done<$relcsv
-	fi
-	# TODO: support due_date
-	if [ "$(jq -r .description $tmpjson)" != null ] ; then
-		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
-	fi
+	__format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || return 1
 	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $tmpfile
-
+	local projectid=$(jq -r .project.id $tmpjson)
 	rm -f $TMPD/$issueid/legends
 	generate_legends >> $TMPD/$issueid/legends
 	generate_version_legends $projectid >> $TMPD/$issueid/legends
@@ -497,9 +461,21 @@ update_issue() {
 			read input
 		else
 			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
-			echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
-			echo "BE CAREFUL!! if you forget to add -f option on next call, draft file will be downloaded again and your local change will be overwritten."
-			break
+			get_conflict $issueid "$(cat $TMPD/$issueid/timestamp)" > $RM_CONFIG/tmp.draft.conflict
+			if [ -s "$RM_CONFIG/tmp.draft.conflict" ] ; then
+				# TODO: assuming markdown now, need to support textile format?
+				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $TMPD/$issueid/draft.md
+				echo "~~~" >> $TMPD/$issueid/draft.md
+				cat $RM_CONFIG/tmp.draft.conflict >> $TMPD/$issueid/draft.md
+				echo "~~~" >> $TMPD/$issueid/draft.md
+				echo "type any key to reopen editor again."
+				read input
+				date --iso-8601=seconds > $TMPD/$issueid/timestamp
+			else
+				echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
+				echo "BE CAREFUL!! if you forget to add -f option on next call, draft file will be downloaded again and your local change will be overwritten."
+				break
+			fi
 		fi
 	done
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
@@ -567,6 +543,21 @@ check_ticket_id_format() {
 
 get_local_ticket_list() {
 	ls -1 $RM_CONFIG/edit_memo | grep ^L
+}
+
+get_conflict() {
+	local issueid=$1
+	local tstamp=$(date -d $2 +%s)
+	local tmpjson=$TMPD/$issueid/issue.json
+	local draftfile=$TMPD/$issueid/draft.md
+
+	[ ! "$tstamp" ] && echo "failed to get tstamp" >&2 && return 1
+
+	fetch_issue "$issueid" "" "$tmpjson" || return 1
+	__format_to_draft "$tmpjson" /tmp/sdf.tmp "" || return 1
+	awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' $draftfile > /tmp/draft.md
+
+	diff -u /tmp/draft.md /tmp/sdf.tmp
 }
 
 if [ ! "$RM_BASEURL" ] ; then
