@@ -17,7 +17,7 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
-LIMIT=25
+[ ! "$LIMIT" ] && LIMIT=25
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
