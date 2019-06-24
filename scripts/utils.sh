@@ -130,22 +130,88 @@ upload_ticket() {
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
+__curl() {
+	local api="$1"
+	local out="$2"
+	local tmpf=$(mktemp)
+	local data="$3"
+
+	[ ! "$out" ] && echo "invalid input" && return 1
+	curl ${INSECURE:+-k} -s "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" > $tmpf || return 1
+	if [ -s "$tmpf" ] ; then
+		mkdir -p $(dirname $out)
+		mv $tmpf $out
+	else
+		return 1
+	fi
+}
+
+fetch_issue() {
+	local issueid="$1"
+	local relcsv="$2"
+	local tmpjson="$3"
+	local tmpf=$RM_CONFIG/tmp.tmp
+
+	__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
+	jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' /tmp/32 | tr -d \" > $relcsv
+
+	__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
+	jq -r .issue /tmp/37 > $tmpjson
+}
+
+__format_to_draft() {
+	local tmpjson="$1"
+	local tmpfile="$2"
+	local relcsv="$3"
+
+	# cat $tmpjson
+	[ -s "$tmpfile" ] && rm $tmpfile
+	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
+	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
+	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
+	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
+	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
+	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
+	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
+	echo "#+ParentIssue: $(jq -r .parent.name $tmpjson)" >> $tmpfile
+	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
+	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
+	echo "#+Version: $(jq -r .fixed_version.name $tmpjson)" >> $tmpfile
+	echo "#+Format: $RM_FORMAT" >> $tmpfile
+
+	if [ -s "$relcsv" ] ; then
+		while read line ; do
+			local type=$(echo $line | cut -f2 -d,)
+			if [ "$type" == "blocks" ] ; then
+				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
+			elif [ "$type" == "precedes" ] ; then
+				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+			elif [ "$type" == "relates" ] ; then
+				local relates_to=$(echo $line | cut -f3 -d,)
+				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
+					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				fi
+			else
+				echo "unsupported type $type" >&2
+				exit 1
+			fi
+		done<$relcsv
+	fi
+	# TODO: support due_date
+	if [ "$(jq -r .description $tmpjson)" != null ] ; then
+		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
+	fi
+}
+
 download_issue() {
 	local issueid=$1
 	local tmpjson=$TMPD/$issueid/issue.json
 	local tmpfile=$TMPD/$issueid/draft.md
 	local relcsv=$TMPD/$issueid/relations.csv
 
-	# curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq .issues[] > $tmpjson
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/$issueid/relations.json?key=$RM_KEY"  | jq -r '.relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @csv' | tr -d \" >  $relcsv
-	curl ${INSECURE:+-k} -s "$RM_BASEURL/issues/${issueid}.json?key=${RM_KEY}&include=journals" | jq .issue > $tmpjson
-	# TODO: check not found.
+	fetch_issue "$issueid" "$relcsv" "$tmpjson" || return 1
 	local projectid=$(jq -r .project.id $tmpjson)
-
-	if [ ! "$tmpjson" ] ; then
-		echo "Failed to download data of issue $issueid." >&2
-		return 1
-	fi
 
 	# cat $tmpjson
 	[ -s "$tmpfile" ] && rm $tmpfile
@@ -470,7 +536,8 @@ open_with_browser() {
 	elif which gnome-open > /dev/null; then
 		gnome-open "$url"
 	else
-		echo "Could not detect the web browser to use."
+		echo "Could not detect the web browser to use. Manually copy the following URL:"
+		echo $url
 	fi
 }
 

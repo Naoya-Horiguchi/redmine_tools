@@ -56,6 +56,7 @@
 #   - add mode in which opened ticket list or ticket with browser
 #   - show figures in description with attachment url
 #   - sanitize invalid ticket status
+#   - implement "report" command to construct report from given set of ticket
 #
 
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)

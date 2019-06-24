@@ -37,13 +37,20 @@ START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
 
 generate_project_table PJTABLE
+declare -A clock_per_project
 
+totalclock=0
 rm $RM_CONFIG/tmp.clock_summary 2> /dev/null
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	dir=$(dirname $f)
 	id=$(basename $dir)
 	subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
 	project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
+	if [ ! "$project" ] ; then
+		project=null
+	else
+		project=${PJTABLE[$project]}
+	fi
 
 	sum=0
 	# filter out with file timestamp
@@ -62,6 +69,34 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 		[ ! "${sum[$id]}" ] && sum[$id]=0
 		sum=$[$sum + $tout - $tin]
 	done
-	echo -e "$id\t$[sum/60]\t${PJTABLE[$project]}\t$subject" >> $RM_CONFIG/tmp.clock_summary
+	[ "$sum" -eq 0 ] && continue
+	totalclock=$[totalclock + sum]
+	[ ! "${clock_per_project["$project"]}" ] && clock_per_project["$project"]=0
+	clock_per_project["$project"]=$[clock_per_project["$project"]+$sum]
+	if [ "$[sum/60]" -gt 0 ] ; then
+		echo -e "$id\t$[sum/60]\t$project\t$subject" >> $RM_CONFIG/tmp.clock_summary
+	fi
 done
-cat $RM_CONFIG/tmp.clock_summary | column -t -s $'\t' | sort -k2n
+
+TMPF=$(mktemp)
+
+rm -f $RM_CONFIG/tmp.proj_clock_summary
+for proj in ${!clock_per_project[@]} ; do
+	[ "${clock_per_project[$proj]}" -lt 60 ] && continue
+	echo -e " \t$[${clock_per_project[$proj]}/60]\t$proj" >> $RM_CONFIG/tmp.proj_clock_summary
+done
+cp $RM_CONFIG/tmp.proj_clock_summary $TMPF
+sort -k1n $TMPF > $RM_CONFIG/tmp.proj_clock_summary
+
+cp $RM_CONFIG/tmp.clock_summary $TMPF
+sort -k2n $TMPF > $RM_CONFIG/tmp.clock_summary
+
+if [ -s "$RM_CONFIG/tmp.clock_summary" ] ; then
+	(
+		cat $RM_CONFIG/tmp.clock_summary # | column -t -s $'\t' | sort -k2n
+		echo -e "---\t---\t---\t---"
+		cat $RM_CONFIG/tmp.proj_clock_summary # | column -t -s $'\t' | sort -k2n
+		echo -e "---\t---\t---\t---"
+		echo -e " \t$[totalclock/60]\ttotal\t "
+	) | column -t -s $'\t'
+fi

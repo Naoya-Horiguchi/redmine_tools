@@ -62,9 +62,9 @@ if [ "$INCLUDE_LOCAL" ] ; then
 		subject="$(grep -i ^#\+subject: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+subject: *||i')"
 		project="$(grep -i ^#\+project: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+project: *||i')"
 		if [ ! "$project" ] ; then
-			projet=null
+			project=null
 		else
-			eproject=${PJTABLE[$project]}
+			project=${PJTABLE[$project]}
 		fi
 		status="$(grep -i ^#\+status: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+status: *||i')"
 		[ ! "$status" ] && status=null
