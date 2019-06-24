@@ -214,48 +214,9 @@ download_issue() {
 	local relcsv=$TMPD/$issueid/relations.csv
 
 	fetch_issue "$issueid" "$relcsv" "$tmpjson" || return 1
-	local projectid=$(jq -r .project.id $tmpjson)
-
-	# cat $tmpjson
-	[ -s "$tmpfile" ] && rm $tmpfile
-	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
-	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
-	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
-	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
-	echo "#+Project: $(jq -r .project.id $tmpjson)" >> $tmpfile
-	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
-	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
-	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
-	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
-	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
-	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Format: $RM_FORMAT" >> $tmpfile
-
-	if [ -s "$relcsv" ] ; then
-		while read line ; do
-			local type=$(echo $line | cut -f2 -d,)
-			if [ "$type" == "blocks" ] ; then
-				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
-			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
-			elif [ "$type" == "relates" ] ; then
-				local relates_to=$(echo $line | cut -f3 -d,)
-				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
-				fi
-			else
-				echo "unsupported type $type" >&2
-				exit 1
-			fi
-		done<$relcsv
-	fi
-	# TODO: support due_date
-	if [ "$(jq -r .description $tmpjson)" != null ] ; then
-		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
-	fi
+	__format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || return 1
 	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $tmpfile
-
+	local projectid=$(jq -r .project.id $tmpjson)
 	rm -f $TMPD/$issueid/legends
 	generate_legends >> $TMPD/$issueid/legends
 	generate_version_legends $projectid >> $TMPD/$issueid/legends
