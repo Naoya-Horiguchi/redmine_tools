@@ -181,7 +181,7 @@ __format_to_draft() {
 	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Version: $(jq -r .fixed_version.name $tmpjson)" >> $tmpfile
+	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
 	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
 		while read line ; do
