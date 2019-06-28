@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# Usage
+#   redmine config [options] <type>
+#
+# Description
+#   <type> can be "project", "tracker", "priority", "status", "user",
+#   "version".
+#
+# Options
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+show_projects() {
+	__curl "/projects.json" $RM_CONFIG/projects.json "limit=100"
+	jq -r ".projects[] | [.id, .name] | @tsv" $RM_CONFIG/projects.json | sort -k1n | column -t -s $'\t'
+}
+
+show_users() {
+	__curl "/users.json" $RM_CONFIG/users.json "limit=100"
+	jq -r ".users[] | [.id, .login] | @tsv" $RM_CONFIG/users.json | sort -k1n | column -t -s $'\t'
+}
+
+show_statuses() {
+	__curl "/issue_statuses.json" $RM_CONFIG/issue_statuses.json "limit=100"
+	jq -r ".issue_statuses[] | [.id, .name] | @tsv" $RM_CONFIG/issue_statuses.json | sort -k1n | column -t -s $'\t'
+}
+
+show_priorities() {
+	__curl "/enumerations/issue_priorities.json" "$RM_CONFIG/priorities.json" "limit=100"
+	jq -r ".issue_priorities[] | [.id, .name] | @tsv" $RM_CONFIG/priorities.json | sort -k1n | column -t -s $'\t'
+}
+
+show_trackers() {
+	__curl "/trackers.json" $RM_CONFIG/trackers.json "limit=100"
+	jq -r ".trackers[] | [.id, .name] | @tsv" $RM_CONFIG/trackers.json | sort -k1n | column -t -s $'\t'
+}
+
+show_versions() {
+	__curl "/projects/1/versions.json" "$RM_CONFIG/versions/1.json" "limit=100"
+	jq -r ".versions[] | [.id, .project.name, .name] | @tsv" $RM_CONFIG/versions/1.json | sort -k1n | column -t -s $'\t'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+# TODO: support pagination (当面は 1 ページ以内に収まる)
+# TODO: ondemand update (リスト表示のとき、内部処理でID 参照が見つからないときの延長で curl する)
+
+type=$1
+
+case "$type" in
+	pro|proj|proje|projec|project|projects)
+		show_projects
+		;;
+	u|us|use|user|users)
+		show_users
+		;;
+	s|st|sta|stat|statu|status|statuse|statuses)
+		show_statuses
+		;;
+	pri|prio|prior|priori|priorit|priority|prioriti|priorities)
+		show_priorities
+		;;
+	t|tr|tra|trac|track|tracke|tracker|trackers)
+		show_trackers
+		;;
+	v|ve|ver|vers|versi|versio|version|versions)
+		show_versions
+		;;
+	a|al|all)
+		echo "--- versions"
+		show_versions
+		echo "--- projects"
+		show_projects
+		echo "--- statuses"
+		show_statuses
+		echo "--- trackers"
+		show_trackers
+		echo "--- priorities"
+		show_priorities
+		echo "--- users"
+		show_users
+		;;
+	*)
+		show_help
+		;;
+esac
