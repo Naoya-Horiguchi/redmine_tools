@@ -173,7 +173,7 @@ __format_to_draft() {
 	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
 	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
 	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
-	echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
+	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
