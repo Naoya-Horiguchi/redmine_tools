@@ -10,6 +10,7 @@
 #   -a user_id    filter ticket with given user (user ID or "me")
 #   -c            include closed tickets
 #   -l            include local tickets
+#   -A|--all      show all possible tickets
 #   -h            show this message
 #
 
@@ -34,6 +35,12 @@ while [[ $# -gt 0 ]] ; do
 			shift
 			;;
 		-l)
+			INCLUDE_LOCAL=true
+			shift
+			;;
+		-A|--all)
+			LIMIT=10000
+			INCLUDE_CLOSED=true
 			INCLUDE_LOCAL=true
 			shift
 			;;
