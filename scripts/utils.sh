@@ -277,22 +277,20 @@ generate_issue_template() {
 
 keep_original_draft() {
 	local issueid=$1
-	local tmpfile=$TMPD/$issueid/draft.md
 
-	cp $tmpfile $tmpfile.bak
+	cp $TMPD/$issueid/draft.md $TMPD/$issueid/tmp.draft.md
 }
 
 edit_issue() {
 	local issueid=$1
-	local tmpfile=$TMPD/$issueid/draft.md
 
 	while true ; do
 		if [ "$RM_LEGEND" ] ; then
-			$EDITOR $TMPD/$issueid/legends $tmpfile
+			$EDITOR $TMPD/$issueid/legends $TMPD/$issueid/draft.md
 		else
-			$EDITOR $tmpfile
+			$EDITOR $TMPD/$issueid/draft.md
 		fi
-		diff -u $tmpfile.bak $tmpfile > $TMPD/$issueid/edit.diff
+		diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
 		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
 			echo "no diff, so no need to upload"
 			return 1
@@ -425,7 +423,7 @@ prepare_draft_file() {
 			download_issue $issueid || return 1
 		fi
 	fi
-	echo $CLOCK_START > $TMPD/$issueid/timestamp
+	echo $CLOCK_START > $TMPD/$issueid/tmp.timestamp
 	keep_original_draft $issueid
 }
 
@@ -437,15 +435,15 @@ update_issue() {
 		edit_issue $issueid || break
 		[ "$LOCALTICKET" ] && break
 		[[ "$issueid" =~ ^L ]] && break
-		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/timestamp) +%s)"
+		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/tmp.timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
 
 		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
 			if [ "$issueid" == new ] ; then
-				create_issue $issueid > $TMPD/$issueid/created.json
+				create_issue $issueid > $TMPD/$issueid/issue.json
 				if [ "$?" -eq 0 ] ; then
-					local newid=$(jq -r .issue.id $TMPD/$issueid/created.json)
+					local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
 					if [ "$newid" ] ; then
 						echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
 						mv $TMPD/$issueid/ $TMPD/$newid/
@@ -461,7 +459,7 @@ update_issue() {
 			read input
 		else
 			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
-			get_conflict $issueid "$(cat $TMPD/$issueid/timestamp)" > $RM_CONFIG/tmp.draft.conflict
+			get_conflict $issueid "$(cat $TMPD/$issueid/tmp.timestamp)" > $RM_CONFIG/tmp.draft.conflict
 			if [ -s "$RM_CONFIG/tmp.draft.conflict" ] ; then
 				# TODO: assuming markdown now, need to support textile format?
 				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $TMPD/$issueid/draft.md
@@ -470,7 +468,7 @@ update_issue() {
 				echo "~~~" >> $TMPD/$issueid/draft.md
 				echo "type any key to reopen editor again."
 				read input
-				date --iso-8601=seconds > $TMPD/$issueid/timestamp
+				date --iso-8601=seconds > $TMPD/$issueid/tmp.timestamp
 			else
 				echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
 				echo "BE CAREFUL!! if you forget to add -f option on next call, draft file will be downloaded again and your local change will be overwritten."
