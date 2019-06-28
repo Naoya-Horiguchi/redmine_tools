@@ -181,7 +181,7 @@ __format_to_draft() {
 	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Version: $(jq -r .fixed_version.name $tmpjson)" >> $tmpfile
+	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
 	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
 		while read line ; do
@@ -328,7 +328,7 @@ update_relations() {
 		local newprecedes="$(grep -i ^+#+precedes: $TMPD/$issueid/edit.diff | sed 's|^+#+precedes: *||i')"
 
 		if [ "$newprecedes" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_id\": $newblocks, \"relation_type\": \"precedes\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
+			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newprecedes, \"relation_type\": \"precedes\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
