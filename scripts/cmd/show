@@ -6,6 +6,7 @@
 # Description
 #
 # Options
+#   -n            display notes
 #   -h            show this message
 #
 
@@ -15,9 +16,15 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
+SHOW_JOURNALS=
+
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
+		-n)
+			SHOW_JOURNALS=true
+			shift
+			;;
 		-h)
 			show_help
 			exit 0
@@ -36,10 +43,14 @@ if ! check_ticket_id_format $ISSUEID ; then
 fi
 
 # TODO: better file name
-tmpjson=$TMPD/$ISSUEID/issue2.json
-tmpfile=$TMPD/$ISSUEID/draft2.md
-relcsv=$TMPD/$ISSUEID/relations2.csv
+tmpjson=$TMPD/$ISSUEID/issue.json
+tmpfile=$TMPD/$ISSUEID/draft.md
+relcsv=$TMPD/$ISSUEID/relations.csv
 
 fetch_issue "$ISSUEID" "$relcsv" "$tmpjson" || exit 1
 __format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || exit 1
 cat $tmpfile
+if [ "$SHOW_JOURNALS" ] ; then
+	echo
+	jq -r '.journals[] | select(.notes != "") | "===> \(.user.name) on \(.created_on)\n\(.notes)"' $tmpjson
+fi

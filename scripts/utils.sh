@@ -296,7 +296,7 @@ edit_issue() {
 			return 1
 		fi
 		cat $TMPD/$issueid/edit.diff
-		[ "$LOCALTICKET" ] && return 0
+		[ "$LOCALTICKET" ] && return 0 # new local ticket
 		echo
 		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
 		read input
