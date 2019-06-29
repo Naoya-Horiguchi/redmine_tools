@@ -8,6 +8,7 @@
 #   "version".
 #
 # Options
+#   -u|--update   update/download config
 #   -h            show this message
 #
 
@@ -45,9 +46,28 @@ show_versions() {
 	jq -r ".versions[] | [.id, .project.name, .name] | @tsv" $RM_CONFIG/versions/1.json | sort -k1n | column -t -s $'\t'
 }
 
+update_config() {
+	__curl "/projects.json" $RM_CONFIG/projects.json "limit=100"
+	for id in $(jq -r ".projects[].id" $RM_CONFIG/projects.json) ; do
+		__curl "/projects/$id/versions.json" "$RM_CONFIG/versions/${id}.json" "limit=100"
+	done
+
+	__curl "/enumerations/issue_priorities.json" "$RM_CONFIG/priorities.json" "limit=100"
+
+	__curl "/trackers.json" "$RM_CONFIG/trackers.json" "limit=100"
+
+	__curl "/users.json" "$RM_CONFIG/users.json" "limit=100"
+
+	__curl "/issue_statuses.json" "$RM_CONFIG/issue_statuses.json" "limit=100"
+}
+
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
+		-u|--update)
+			update_config
+			exit 0
+			;;
 		-h)
 			show_help
 			exit 0
