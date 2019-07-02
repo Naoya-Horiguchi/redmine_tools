@@ -32,9 +32,9 @@ END=$2
 [ ! "$START" ] && START="$(date --date="today 0:00" +%Y/%m/%d)"
 [ ! "$END" ] && END="$(date --date="$START 23:59" --iso-8601=seconds)"
 
-echo "Clock during [$START, $END)"
 START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
+echo "Clock during [$(date -d @$START), $(date -d @$END))"
 
 generate_project_table PJTABLE
 declare -A clock_per_project
@@ -44,10 +44,14 @@ rm $RM_CONFIG/tmp.clock_summary 2> /dev/null
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	dir=$(dirname $f)
 	id=$(basename $dir)
+
+	if [ "$id" == new ] || [ "$id" == null ] ; then
+		continue
+	fi
 	# TODO: move this to utils.sh
 	if [ -s "$dir/issue.json" ] ; then
-		project="$(jq -r .project.id $dir/issue.json)"
 		subject="$(jq -r .subject $dir/issue.json)"
+		project="$(jq -r .project.id $dir/issue.json)"
 	else
 		subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
 		project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
