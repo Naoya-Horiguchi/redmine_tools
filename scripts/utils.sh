@@ -456,8 +456,30 @@ prepare_draft_file() {
 	keep_original_draft $issueid
 }
 
+__check_opened() {
+	local issueid=$1
+
+	if [ ! -s "$TMPD/$issueid/.clock.log" ] ; then
+		# echo "first open"
+		return 0
+	fi
+
+	local tailsize=$(tail -n1 $TMPD/$issueid/.clock.log | wc -c)
+	if [ "$tailsize" -eq 26 ] ; then # dangling open
+		echo "Issue $issueid is opened by other process."
+		return 1
+	elif [ "$tailsize" -eq 52 ] ; then
+		return 0
+	else
+		echo "clock log of issue $issueid is broken."
+		return 1
+	fi
+}
+
 update_issue() {
 	local issueid=$1
+
+	__check_opened $issueid || return 1
 
 	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
