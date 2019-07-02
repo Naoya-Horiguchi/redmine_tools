@@ -203,7 +203,9 @@ __format_to_draft() {
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
 	echo "#+ParentIssue: $(jq -r .parent.name $tmpjson)" >> $tmpfile
-	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
@@ -284,7 +286,9 @@ generate_issue_template() {
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
 	echo "#+ParentIssue: null" >> $tmpfile
-	echo "#+Assigned: null" >> $tmpfile
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: null" >> $tmpfile
+	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
