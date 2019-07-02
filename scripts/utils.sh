@@ -484,11 +484,6 @@ update_issue() {
 	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
 		edit_issue $issueid || break
-		if [[ "$issueid" =~ ^L ]] ; then
-			__update_ticket $TMPD/$issueid/draft.md $issueid || return 1
-			mv $TMPD/$issueid/upload.json $TMPD/$issueid/issue.json
-			break
-		fi
 		[[ "$issueid" =~ ^L ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/tmp.timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
@@ -499,7 +494,10 @@ update_issue() {
 				create_issue $issueid > $TMPD/$issueid/issue.json
 				if [ "$?" -eq 0 ] ; then
 					local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
-					if [ "$newid" ] ; then
+					if [ ! "$newid" ] || [ "$newid" == null ] ; then
+						echo $TMPD/$issueid/issue.json
+						echo "create issue failed"
+					else
 						echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
 						mv $TMPD/$issueid/ $TMPD/$newid/
 						issueid=$newid
