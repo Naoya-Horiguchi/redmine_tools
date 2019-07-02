@@ -130,6 +130,31 @@ upload_ticket() {
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
+__curl_limit() {
+	local api="$1"
+	local out="$2"
+	local data="$3"
+	local limit="$4"
+	local step=100
+
+	local requestbase="$RM_BASEURL${api}?key=${RM_KEY}"
+	local totalcount=$(curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}" | jq .total_count)
+	[ ! "$totalcount" ] && return 1
+	[ "$limit" -gt "$totalcount" ] && limit=$totalcount
+	local pages=$[($limit - 1) / $step + 1]
+	[ ! "$totalcount" ] && return 1
+
+	local tmpd=$(mktemp -d)
+	local files=
+	for i in $(seq 0 $[pages-1]) ; do
+		curl ${INSECURE:+-k} -s "${requestbase}&offset=$[i*step]&limit=$[limit-i*step]" > $tmpd/page.$i.json || exit 1
+		files="$files $tmpd/page.$i.json"
+	done
+
+	jq 'reduce inputs as $i (.; .issues += $i.issues)' $files > $out
+	rm -rf $tmpd
+}
+
 __curl() {
 	local api="$1"
 	local out="$2"
@@ -178,7 +203,9 @@ __format_to_draft() {
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
 	echo "#+ParentIssue: $(jq -r .parent.name $tmpjson)" >> $tmpfile
-	echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
+	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
@@ -259,7 +286,9 @@ generate_issue_template() {
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
 	echo "#+ParentIssue: null" >> $tmpfile
-	echo "#+Assigned: null" >> $tmpfile
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: null" >> $tmpfile
+	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
@@ -427,17 +456,34 @@ prepare_draft_file() {
 	keep_original_draft $issueid
 }
 
+__check_opened() {
+	local issueid=$1
+
+	if [ ! -s "$TMPD/$issueid/.clock.log" ] ; then
+		# echo "first open"
+		return 0
+	fi
+
+	local tailsize=$(tail -n1 $TMPD/$issueid/.clock.log | wc -c)
+	if [ "$tailsize" -eq 26 ] ; then # dangling open
+		echo "Issue $issueid is opened by other process."
+		return 1
+	elif [ "$tailsize" -eq 52 ] ; then
+		return 0
+	else
+		echo "clock log of issue $issueid is broken."
+		return 1
+	fi
+}
+
 update_issue() {
 	local issueid=$1
+
+	__check_opened $issueid || return 1
 
 	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
 		edit_issue $issueid || break
-		if [[ "$issueid" =~ ^L ]] ; then
-			__update_ticket $TMPD/$issueid/draft.md $issueid || return 1
-			mv $TMPD/$issueid/upload.json $TMPD/$issueid/issue.json
-			break
-		fi
 		[[ "$issueid" =~ ^L ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/tmp.timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
@@ -448,7 +494,10 @@ update_issue() {
 				create_issue $issueid > $TMPD/$issueid/issue.json
 				if [ "$?" -eq 0 ] ; then
 					local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
-					if [ "$newid" ] ; then
+					if [ ! "$newid" ] || [ "$newid" == null ] ; then
+						echo $TMPD/$issueid/issue.json
+						echo "create issue failed"
+					else
 						echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
 						mv $TMPD/$issueid/ $TMPD/$newid/
 						issueid=$newid
