@@ -130,6 +130,31 @@ upload_ticket() {
 	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
+__curl_limit() {
+	local api="$1"
+	local out="$2"
+	local data="$3"
+	local limit="$4"
+	local step=100
+
+	local requestbase="$RM_BASEURL${api}?key=${RM_KEY}"
+	local totalcount=$(curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}" | jq .total_count)
+	[ ! "$totalcount" ] && return 1
+	[ "$limit" -gt "$totalcount" ] && limit=$totalcount
+	local pages=$[($limit - 1) / $step + 1]
+	[ ! "$totalcount" ] && return 1
+
+	local tmpd=$(mktemp -d)
+	local files=
+	for i in $(seq 0 $[pages-1]) ; do
+		curl ${INSECURE:+-k} -s "${requestbase}&offset=$[i*step]&limit=$[limit-i*step]" > $tmpd/page.$i.json || exit 1
+		files="$files $tmpd/page.$i.json"
+	done
+
+	jq 'reduce inputs as $i (.; .issues += $i.issues)' $files > $out
+	rm -rf $tmpd
+}
+
 __curl() {
 	local api="$1"
 	local out="$2"
