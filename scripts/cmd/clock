@@ -48,18 +48,24 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	if [ "$id" == new ] || [ "$id" == null ] ; then
 		continue
 	fi
-	# TODO: move this to utils.sh
-	if [ -s "$dir/issue.json" ] ; then
-		subject="$(jq -r .subject $dir/issue.json)"
-		project="$(jq -r .project.id $dir/issue.json)"
-	else
+
+	if [[ "$id" =~ ^L ]] ; then
 		subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
 		project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
+	elif [ ! -s "$dir/issue.json" ] ; then
+		continue
+	else
+		subject="$(jq -r .subject $dir/issue.json)"
+		project="$(jq -r .project.id $dir/issue.json)"
 	fi
 	if [ ! "$project" ] ; then
 		project=null
 	else
 		project=${PJTABLE[$project]}
+		if [ ! "$project" ] ; then
+			echo warning no project $id
+			continue
+		fi
 	fi
 
 	sum=0
