@@ -406,9 +406,13 @@ update_relations() {
 		fi
 	done
 
-	grep -i "^-#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
-		local oldrelates="$(grep -i ^-#+relates: $TMPD/$issueid/edit.diff | sed 's|^-#+relates: *||i')"
-		if [ "$oldrelates" -gt "$issueid" ] ; then
+	grep -i "^-#+relates:" $dir/edit.diff | while read line ; do
+		# TODO: 横展開の必要あり
+		relid=
+		local oldrelates="$(grep -i ^-#+relates: $dir/edit.diff | sed 's|^-#+relates: *||i')"
+		if [ ! "$oldrelates" ] ; then
+			true
+		elif [ "$oldrelates" -gt "$issueid" ] ; then
 			local relid=$(grep $issueid,relates,$oldrelates $relcsv | cut -f4 -d,)
 		else
 			local relid=$(grep $oldrelates,relates,$issueid $relcsv | cut -f4 -d,)
@@ -436,9 +440,27 @@ create_issue() {
 
 	mkdir -p $TMPD/$issueid
 	[ "$VERBOSE" ] && echo "create_ticket"
-	create_ticket $tmpfile $issueid || return 1
+	create_ticket $tmpfile $issueid > $TMPD/$issueid/tmp.issue.json
+	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
+	[[ "$issueid" =~ ^L ]] && return 0
+	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
+	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
 	[ "$VERBOSE" ] && echo update_relations $issueid
-	update_relations $issueid || return 1
+	update_relations "$issueid" new || return 1
+	return 0
+
+	[[ "$issueid" =~ ^L ]] && return 0
+	# TODO: update_local_data
+	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
+	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
+	# TODO: 複数 issue の作成がコンフリクトしうる、そもそもローカルキャッシュなので
+	# new をリネームする必要は薄いと思われる。
+	# TODO: クロック関連の処理が怪しくなるのでリネームはクロック処理が終わった後にすべき。
+	rsync -a $TMPD/new/ $TMPD/$issueid/
+	# fetch_issue "$issueid" "" "$TMPD/$issueid/issue.json"
+	jq ".issue" $TMPD/$issueid/tmp.issue.json > $TMPD/$issueid/issue.json || return 1
+	[ "$VERBOSE" ] && echo update_relations $issueid
+	update_relations "$issueid" new || return 1
 }
 
 prepare_draft_file() {
@@ -504,17 +526,17 @@ update_issue() {
 
 		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
 			if [ "$issueid" == new ] ; then
-				create_issue $issueid > $TMPD/$issueid/issue.json
+				create_issue $issueid
 				if [ "$?" -eq 0 ] ; then
-					local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
-					if [ ! "$newid" ] || [ "$newid" == null ] ; then
-						echo $TMPD/$issueid/issue.json
-						echo "create issue failed"
-					else
-						echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
-						mv $TMPD/$issueid/ $TMPD/$newid/
-						issueid=$newid
-					fi
+					# local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
+					# if [ ! "$newid" ] || [ "$newid" == null ] ; then
+					# 	echo $TMPD/$issueid/issue.json
+					# 	echo "create issue failed"
+					# else
+					# 	echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
+					# 	mv $TMPD/$issueid/ $TMPD/$newid/
+					# 	issueid=$newid
+					# fi
 					break
 				fi
 			else
