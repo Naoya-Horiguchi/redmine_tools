@@ -51,6 +51,7 @@ __update_ticket() {
 	fi
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
+	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
 	# category
 	local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
 	# TODO: input in string format "<project> - <version>" is not supported yet.
@@ -95,6 +96,10 @@ __update_ticket() {
 	fi
 	if [ "$estimate" ] ; then
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
+	fi
+	if [ "$due_date" ] ; then
+		local date_text="$(date -d "$due_date" +%Y-%m-%d)"
+		json_add_text $TMPD/$issue/upload.json .issue.due_date "$date_text" || return 1
 	fi
 	# category
 	if [ "$version_id" ] ; then
@@ -207,6 +212,7 @@ __format_to_draft() {
 		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
+	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
@@ -228,7 +234,6 @@ __format_to_draft() {
 			fi
 		done<$relcsv
 	fi
-	# TODO: support due_date
 	if [ "$(jq -r .description $tmpjson)" != null ] ; then
 		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
 	fi
@@ -291,6 +296,7 @@ generate_issue_template() {
 	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
+	echo "#+DueDate: null" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
 	echo "#+Version: null" >> $tmpfile
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
