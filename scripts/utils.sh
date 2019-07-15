@@ -331,6 +331,7 @@ edit_issue() {
 			return 1
 		fi
 		cat $TMPD/$issueid/edit.diff
+		[[ "$issueid" =~ ^L ]] && return 0
 		[ "$LOCALTICKET" ] && return 0 # new local ticket
 		echo
 		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
@@ -347,42 +348,46 @@ edit_issue() {
 
 update_relations() {
 	local issueid=$1
-	local relcsv=$TMPD/$issueid/relations.csv
+	local new=$2  # might be empty string
+	local dir=$TMPD/$issueid
+	[ "$new" ] && dir="$TMPD/$new"
+	local relcsv=$dir/relations.csv
+	touch $relcsv
 
-	grep -i "^+#+blocks:" $TMPD/$issueid/edit.diff | while read line ; do
-		local newblocks="$(grep -i ^+#+blocks: $TMPD/$issueid/edit.diff | sed 's|^+#+blocks: *||i')"
+	grep -i "^+#+blocks:" $dir/edit.diff | while read line ; do
+		local newblocks="$(grep -i ^+#+blocks: $dir/edit.diff | sed 's|^+#+blocks: *||i')"
 
 		if [ "$newblocks" ] ; then
 			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newblocks, \"relation_type\": \"blocks\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
-	grep -i "^+#+precedes:" $TMPD/$issueid/edit.diff | while read line ; do
-		local newprecedes="$(grep -i ^+#+precedes: $TMPD/$issueid/edit.diff | sed 's|^+#+precedes: *||i')"
+	grep -i "^+#+precedes:" $dir/edit.diff | while read line ; do
+		local newprecedes="$(grep -i ^+#+precedes: $dir/edit.diff | sed 's|^+#+precedes: *||i')"
 
 		if [ "$newprecedes" ] ; then
 			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newprecedes, \"relation_type\": \"precedes\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
-	grep -i "^+#+follows:" $TMPD/$issueid/edit.diff | while read line ; do
-		local newfollows="$(grep -i ^+#+follows: $TMPD/$issueid/edit.diff | sed 's|^+#+follows: *||i')"
+	grep -i "^+#+follows:" $dir/edit.diff | while read line ; do
+		local newfollows="$(grep -i ^+#+follows: $dir/edit.diff | sed 's|^+#+follows: *||i')"
 
 		if [ "$newfollows" ] ; then
 			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newfollows, \"relation_type\": \"follows\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
-	grep -i "^+#+relates:" $TMPD/$issueid/edit.diff | while read line ; do
-		local newrelates="$(grep -i ^+#+relates: $TMPD/$issueid/edit.diff | sed 's|^+#+relates: *||i')"
+	grep -i "^+#+relates:" $dir/edit.diff | while read line ; do
+		local newrelates="$(grep -i ^+#+relates: $dir/edit.diff | sed 's|^+#+relates: *||i')"
 
 		if [ "$newrelates" ] ; then
 			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newrelates, \"relation_type\": \"relates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
 		fi
 	done
 
-	grep -i "^-#+blocks:" $TMPD/$issueid/edit.diff | while read line ; do
-		local oldblocks="$(grep -i ^-#+blocks: $TMPD/$issueid/edit.diff | sed 's|^-#+blocks: *||i')"
+	grep -i "^-#+blocks:" $dir/edit.diff | while read line ; do
+		local oldblocks="$(grep -i ^-#+blocks: $dir/edit.diff | sed 's|^-#+blocks: *||i')"
 		local relid=$(grep $issueid,blocks,$oldblocks $relcsv | cut -f4 -d,)
 
 		if [ "$relid" ] ; then
@@ -390,8 +395,8 @@ update_relations() {
 		fi
 	done
 
-	grep -i "^-#+precedes:" $TMPD/$issueid/edit.diff | while read line ; do
-		local oldprecedes="$(grep -i ^-#+precedes: $TMPD/$issueid/edit.diff | sed 's|^-#+precedes: *||i')"
+	grep -i "^-#+precedes:" $dir/edit.diff | while read line ; do
+		local oldprecedes="$(grep -i ^-#+precedes: $dir/edit.diff | sed 's|^-#+precedes: *||i')"
 		local relid=$(grep $oldprecedes,precedes,$issueid $relcsv | cut -f4 -d,)
 
 		if [ "$relid" ] ; then
