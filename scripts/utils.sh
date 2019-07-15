@@ -207,7 +207,7 @@ __format_to_draft() {
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
-	echo "#+ParentIssue: $(jq -r .parent.name $tmpjson)" >> $tmpfile
+	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
 	if [ "$RM_USERLIST" ] ; then
 		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
 	fi
@@ -218,11 +218,12 @@ __format_to_draft() {
 	echo "#+Format: $RM_FORMAT" >> $tmpfile
 	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
 		while read line ; do
+			# TODO: relation の markdown への翻訳がなにかおかしい
 			local type=$(echo $line | cut -f2 -d,)
 			if [ "$type" == "blocks" ] ; then
 				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
 			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
+				echo "#+Precedes: $(echo $line | cut -f -d,)" >> $tmpfile
 			elif [ "$type" == "relates" ] ; then
 				local relates_to=$(echo $line | cut -f3 -d,)
 				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
@@ -283,9 +284,10 @@ generate_issue_template() {
 
 	mkdir -p $TMPD/new
 
-	echo "#+Subject: subject" > $tmpfile
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
+	rm $tmpfile
 	echo "#+Project: " >> $tmpfile
+	echo "#+Subject: subject" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき
 	echo "#+Tracker: Epic" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
