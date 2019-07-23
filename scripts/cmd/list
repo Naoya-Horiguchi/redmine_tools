@@ -97,10 +97,10 @@ fi
 
 if [ "$INCLUDE_LOCAL" != only ] ; then
 	if [ "$NEW_VERSION" ] ; then
-		__curl_limit "/issues.json" /tmp/3333 "${STATUS_OPT}${ASSIGNED_OPT}&sort=updated_on:desc" $LIMIT
+		__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
 		jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' /tmp/3333 > $RM_CONFIG/tmp.ticket_list
 	else
-		curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $RM_CONFIG/tmp.ticket_list
+		curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&include=relations&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $RM_CONFIG/tmp.ticket_list
 	fi
 fi
 
