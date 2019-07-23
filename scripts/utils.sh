@@ -97,7 +97,7 @@ __update_ticket() {
 	if [ "$estimate" ] ; then
 		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
 	fi
-	if [ "$due_date" ] ; then
+	if [ "$due_date" ] && [ "$due_date" != "null" ] ; then
 		local date_text="$(date -d "$due_date" +%Y-%m-%d)"
 		json_add_text $TMPD/$issue/upload.json .issue.due_date "$date_text" || return 1
 	fi
