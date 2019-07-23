@@ -152,7 +152,7 @@ __curl_limit() {
 	local tmpd=$(mktemp -d)
 	local files=
 	for i in $(seq 0 $[pages-1]) ; do
-		curl ${INSECURE:+-k} -s "${requestbase}&offset=$[i*step]&limit=$[limit-i*step]" > $tmpd/page.$i.json || exit 1
+		curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}&offset=$[i*step]&limit=$[limit-i*step]" > $tmpd/page.$i.json || exit 1
 		files="$files $tmpd/page.$i.json"
 	done
 
