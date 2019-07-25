@@ -557,29 +557,20 @@ update_issue() {
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
 
-		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
-			if [ "$issueid" == new ] ; then
-				create_issue $issueid
-				if [ "$?" -eq 0 ] ; then
-					# local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
-					# if [ ! "$newid" ] || [ "$newid" == null ] ; then
-					# 	echo $TMPD/$issueid/issue.json
-					# 	echo "create issue failed"
-					# else
-					# 	echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
-					# 	mv $TMPD/$issueid/ $TMPD/$newid/
-					# 	issueid=$newid
-					# fi
-					break
-				fi
-			else
-				upload_issue $issueid && break
-			fi
+		if [ "$issueid" == new ] ; then
+			create_issue $issueid && break
 			echo "create_issue failed, check draft.md and/or network connection."
+			echo "type any key to open editor again."
+			read input
+		elif [[ "$tstamp_saved" > "$[tstamp_tmp + 60]" ]] || [ "$FORCE_UPDATE" ] ; then
+			upload_issue $issueid && break
+			echo "update_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
 			read input
 		else
 			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
+			echo "tstamp_saved: $tstamp_saved"
+			echo "tstamp_onserver: $tstamp_tmp"
 			get_conflict $issueid "$(cat $TMPD/$issueid/tmp.timestamp)" > $RM_CONFIG/tmp.draft.conflict
 			if [ -s "$RM_CONFIG/tmp.draft.conflict" ] ; then
 				# TODO: assuming markdown now, need to support textile format?
