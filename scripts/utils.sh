@@ -223,11 +223,20 @@ __format_to_draft() {
 			if [ "$type" == "blocks" ] ; then
 				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
 			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f -d,)" >> $tmpfile
+				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
 			elif [ "$type" == "relates" ] ; then
 				local relates_to=$(echo $line | cut -f3 -d,)
 				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
 					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
+				else
+					echo "#+Relates: $(echo $line | cut -f1 -d,)" >> $tmpfile
+				fi
+			elif [ "$type" == "duplicates" ] ; then
+				local targetid=$(echo $line | cut -f3 -d,)
+				if [ "$targetid" -ne "$(jq -r .id $tmpjson)" ] ; then
+					echo "#+Duplicates: $targetid" >> $tmpfile
+				else
+					echo "#+Duplicates: $(echo $line | cut -f1 -d,)" >> $tmpfile
 				fi
 			else
 				echo "unsupported type $type" >&2
@@ -388,6 +397,14 @@ update_relations() {
 		fi
 	done
 
+	grep -i "^+#+duplicates:" $dir/edit.diff | while read line ; do
+		local newduplicates="$(grep -i ^+#+duplicates: $dir/edit.diff | sed 's|^+#+duplicates: *||i')"
+
+		if [ "$newduplicates" ] ; then
+			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newduplicates, \"relation_type\": \"duplicates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
+		fi
+	done
+
 	grep -i "^-#+blocks:" $dir/edit.diff | while read line ; do
 		local oldblocks="$(grep -i ^-#+blocks: $dir/edit.diff | sed 's|^-#+blocks: *||i')"
 		local relid=$(grep $issueid,blocks,$oldblocks $relcsv | cut -f4 -d,)
@@ -416,6 +433,22 @@ update_relations() {
 			local relid=$(grep $issueid,relates,$oldrelates $relcsv | cut -f4 -d,)
 		else
 			local relid=$(grep $oldrelates,relates,$issueid $relcsv | cut -f4 -d,)
+		fi
+
+		if [ "$relid" ] ; then
+			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
+		fi
+	done
+
+	grep -i "^-#+duplicates:" $dir/edit.diff | while read line ; do
+		relid=
+		local oldduplicates="$(grep -i ^-#+duplicates: $dir/edit.diff | sed 's|^-#+duplicates: *||i')"
+		if [ ! "$oldduplicates" ] ; then
+			true
+		elif [ "$oldduplicates" -gt "$issueid" ] ; then
+			local relid=$(grep $issueid,duplicates,$oldduplicates $relcsv | cut -f4 -d,)
+		else
+			local relid=$(grep $oldduplicates,duplicates,$issueid $relcsv | cut -f4 -d,)
 		fi
 
 		if [ "$relid" ] ; then
@@ -524,29 +557,20 @@ update_issue() {
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
 		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
 
-		if [[ "$tstamp_saved" > "$tstamp_tmp" ]] || [ "$FORCE_UPDATE" ] ; then
-			if [ "$issueid" == new ] ; then
-				create_issue $issueid
-				if [ "$?" -eq 0 ] ; then
-					# local newid=$(jq -r .issue.id $TMPD/$issueid/issue.json)
-					# if [ ! "$newid" ] || [ "$newid" == null ] ; then
-					# 	echo $TMPD/$issueid/issue.json
-					# 	echo "create issue failed"
-					# else
-					# 	echo "renaming $TMPD/$issueid/ to $TMPD/$newid/"
-					# 	mv $TMPD/$issueid/ $TMPD/$newid/
-					# 	issueid=$newid
-					# fi
-					break
-				fi
-			else
-				upload_issue $issueid && break
-			fi
+		if [ "$issueid" == new ] ; then
+			create_issue $issueid && break
 			echo "create_issue failed, check draft.md and/or network connection."
+			echo "type any key to open editor again."
+			read input
+		elif [[ "$tstamp_saved" > "$[tstamp_tmp + 60]" ]] || [ "$FORCE_UPDATE" ] ; then
+			upload_issue $issueid && break
+			echo "update_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
 			read input
 		else
 			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
+			echo "tstamp_saved: $tstamp_saved"
+			echo "tstamp_onserver: $tstamp_tmp"
 			get_conflict $issueid "$(cat $TMPD/$issueid/tmp.timestamp)" > $RM_CONFIG/tmp.draft.conflict
 			if [ -s "$RM_CONFIG/tmp.draft.conflict" ] ; then
 				# TODO: assuming markdown now, need to support textile format?
