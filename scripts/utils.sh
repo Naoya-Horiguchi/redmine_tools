@@ -556,14 +556,14 @@ update_issue() {
 		[[ "$issueid" =~ ^L ]] && break
 		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/tmp.timestamp) +%s)"
 		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
-		tstamp_tmp="$(date -d $tstamp_tmp +%s)"
+		[ "$tstamp_tmp" ] && tstamp_tmp="$(date -d $tstamp_tmp +%s)"
 
 		if [ "$issueid" == new ] ; then
 			create_issue $issueid && break
 			echo "create_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
 			read input
-		elif [[ "$tstamp_saved" > "$[tstamp_tmp + 60]" ]] || [ "$FORCE_UPDATE" ] ; then
+		elif [ "$FORCE_UPDATE" ] || ( [ "$tstamp_tmp" ] && [[ "$tstamp_saved" > "$[tstamp_tmp + 60]" ]] ) ; then
 			upload_issue $issueid && break
 			echo "update_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
