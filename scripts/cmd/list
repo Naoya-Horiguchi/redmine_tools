@@ -48,10 +48,6 @@ while [[ $# -gt 0 ]] ; do
 			INCLUDE_LOCAL=true
 			shift
 			;;
-		-N)
-			NEW_VERSION=true
-			shift
-			;;
 		-h)
 			show_help
 			exit 0
@@ -96,12 +92,8 @@ if [ "$LIMIT" ] ; then
 fi
 
 if [ "$INCLUDE_LOCAL" != only ] ; then
-	if [ "$NEW_VERSION" ] ; then
-		__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
-		jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
-	else
-		curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&include=relations&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $RM_CONFIG/tmp.ticket_list
-	fi
+	__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
+	jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
 fi
 
 IFS=$'\t'
