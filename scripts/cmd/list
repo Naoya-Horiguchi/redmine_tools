@@ -18,6 +18,7 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
+[ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
 [ ! "$LIMIT" ] && LIMIT=25
 while [[ $# -gt 0 ]] ; do
 	key="$1"
