@@ -167,7 +167,7 @@ __curl() {
 	local data="$3"
 
 	[ ! "$out" ] && echo "invalid input" && return 1
-	curl ${INSECURE:+-k} -s "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" > $tmpf || return 1
+	curl ${INSECURE:+-k} -s -o $tmpf "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" || return 1
 	if [ -s "$tmpf" ] ; then
 		mkdir -p $(dirname $out)
 		mv $tmpf $out
@@ -500,7 +500,6 @@ create_issue() {
 prepare_draft_file() {
 	local issueid=$1
 
-	CLOCK_START=$(date --iso-8601=seconds)
 	if [ "$LOCALTICKET" ] ; then
 		if [ ! -s "$TMPD/$issueid/draft.md" ] ; then
 			generate_issue_template || return 1
@@ -521,7 +520,8 @@ prepare_draft_file() {
 			download_issue $issueid || return 1
 		fi
 	fi
-	echo $CLOCK_START > $TMPD/$issueid/tmp.timestamp
+	# TODO: ローカルチケットや new の場合は避けたいところ
+	__curl "/issues.json" $TMPD/$issueid/tmp.before_edit "issue_id=$issueid"
 	keep_original_draft $issueid
 }
 
@@ -536,6 +536,7 @@ __check_opened() {
 	local tailsize=$(tail -n1 $TMPD/$issueid/.clock.log | wc -c)
 	if [ "$tailsize" -eq 26 ] ; then # dangling open
 		echo "Issue $issueid is opened by other process."
+		echo "Please edit $TMPD/$issueid/.clock.log and resolved unclosed clock"
 		return 1
 	elif [ "$tailsize" -eq 52 ] ; then
 		return 0
@@ -550,41 +551,37 @@ update_issue() {
 
 	__check_opened $issueid || return 1
 
+	CLOCK_START=$(date --iso-8601=seconds)
 	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
 	while true ; do
 		edit_issue $issueid || break
 		[[ "$issueid" =~ ^L ]] && break
-		local tstamp_saved="$(date -d $(cat $TMPD/$issueid/tmp.timestamp) +%s)"
-		local tstamp_tmp=$(curl ${INSECURE:+-k} -s "$RM_BASEURL/issues.json?issue_id=${issueid}&key=${RM_KEY}&status_id=*" | jq -r ".issues[].updated_on")
-		[ "$tstamp_tmp" ] && tstamp_tmp="$(date -d $tstamp_tmp +%s)"
+		__curl "/issues.json" $TMPD/$issueid/tmp.after_edit "issue_id=$issueid"
 
 		if [ "$issueid" == new ] ; then
 			create_issue $issueid && break
 			echo "create_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
 			read input
-		elif [ "$FORCE_UPDATE" ] || ( [ "$tstamp_tmp" ] && [[ "$tstamp_saved" > "$[tstamp_tmp + 60]" ]] ) ; then
+		elif cmp --silent $TMPD/$issueid/tmp.before_edit $TMPD/$issueid/tmp.after_edit ; then
 			upload_issue $issueid && break
 			echo "update_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
 			read input
 		else
-			echo "The ticket $issueid was updated on server-side after you downloaded it into local file."
-			echo "tstamp_saved: $tstamp_saved"
-			echo "tstamp_onserver: $tstamp_tmp"
-			get_conflict $issueid "$(cat $TMPD/$issueid/tmp.timestamp)" > $RM_CONFIG/tmp.draft.conflict
-			if [ -s "$RM_CONFIG/tmp.draft.conflict" ] ; then
+			get_conflict $issueid > $TMPD/$issueid/tmp.draft.conflict
+			if [ -s "$TMPD/$issueid/tmp.draft.conflict" ] ; then
 				# TODO: assuming markdown now, need to support textile format?
 				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $TMPD/$issueid/draft.md
 				echo "~~~" >> $TMPD/$issueid/draft.md
-				cat $RM_CONFIG/tmp.draft.conflict >> $TMPD/$issueid/draft.md
+				cat $TMPD/$issueid/tmp.draft.conflict >> $TMPD/$issueid/draft.md
 				echo "~~~" >> $TMPD/$issueid/draft.md
+				echo "Conflict is detected, please resolve it manually."
 				echo "type any key to reopen editor again."
 				read input
-				date --iso-8601=seconds > $TMPD/$issueid/tmp.timestamp
+				__curl "/issues.json" $TMPD/$issueid/tmp.before_edit "issue_id=$issueid"
 			else
-				echo "So there's a conflict, you need to resolve conflict and manually upload it with options FORCE_UPDATE=true and NO_DOWNLOAD=true."
-				echo "BE CAREFUL!! if you forget to add -f option on next call, draft file will be downloaded again and your local change will be overwritten."
+				# 誰かが全く同一の更新を行ったことを意味するので、そのまま抜けてしまって構わない。
 				break
 			fi
 		fi
@@ -658,11 +655,8 @@ get_local_ticket_list() {
 
 get_conflict() {
 	local issueid=$1
-	local tstamp=$(date -d $2 +%s)
 	local tmpjson=$TMPD/$issueid/issue.json
 	local draftfile=$TMPD/$issueid/draft.md
-
-	[ ! "$tstamp" ] && echo "failed to get tstamp" >&2 && return 1
 
 	fetch_issue "$issueid" "" "$tmpjson" || return 1
 	__format_to_draft "$tmpjson" /tmp/sdf.tmp "" || return 1
