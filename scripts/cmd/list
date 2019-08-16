@@ -82,6 +82,9 @@ if [ "$INCLUDE_LOCAL" ] ; then
 		[ ! "$status" ] && status=null
 		echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
 	done
+	if [ ! "$INCLUDE_CLOSED" ] ; then
+		sed -i '/\tClosed\t/d' $RM_CONFIG/tmp.local_ticket_list
+	fi
 fi
 
 if [ "$ASSIGNED" ] ; then
