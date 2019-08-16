@@ -56,6 +56,10 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 		continue
 	fi
 
+	if [ "$(date -r $f +%s)" -lt "$START" ] ; then
+		continue
+	fi
+
 	if [[ "$id" =~ ^L ]] ; then
 		subject="$(grep -i ^#\+subject: $dir/draft.md | sed 's|^#+subject: *||i')"
 		project="$(grep -i ^#\+project: $dir/draft.md | sed 's|^#+project: *||i')"
