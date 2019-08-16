@@ -474,6 +474,7 @@ create_issue() {
 	mkdir -p $TMPD/$issueid
 	[ "$VERBOSE" ] && echo "create_ticket"
 	create_ticket $tmpfile $issueid > $TMPD/$issueid/tmp.issue.json
+	cat $TMPD/$issueid/tmp.issue.json
 	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
 	[[ "$issueid" =~ ^L ]] && return 0
 	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
