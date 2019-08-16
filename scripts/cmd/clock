@@ -35,7 +35,7 @@ END=$2
 START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
 
-if [ ! "$START" ] || [ "$END" ] ; then
+if [ ! "$START" ] || [ ! "$END" ] ; then
 	echo "invalid input" >&2
 	show_help
 	exit 1
