@@ -18,6 +18,7 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
+[ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
 [ ! "$LIMIT" ] && LIMIT=25
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -46,10 +47,6 @@ while [[ $# -gt 0 ]] ; do
 			LIMIT=10000
 			INCLUDE_CLOSED=true
 			INCLUDE_LOCAL=true
-			shift
-			;;
-		-N)
-			NEW_VERSION=true
 			shift
 			;;
 		-h)
@@ -85,6 +82,9 @@ if [ "$INCLUDE_LOCAL" ] ; then
 		[ ! "$status" ] && status=null
 		echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
 	done
+	if [ ! "$INCLUDE_CLOSED" ] ; then
+		sed -i '/\tClosed\t/d' $RM_CONFIG/tmp.local_ticket_list
+	fi
 fi
 
 if [ "$ASSIGNED" ] ; then
@@ -96,12 +96,8 @@ if [ "$LIMIT" ] ; then
 fi
 
 if [ "$INCLUDE_LOCAL" != only ] ; then
-	if [ "$NEW_VERSION" ] ; then
-		__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
-		jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
-	else
-		curl -s -k "$RM_BASEURL/issues.json?key=${RM_KEY}${STATUS_OPT}${ASSIGNED_OPT}${LIMIT_OPT}&include=relations&sort=updated_on:desc" | jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' > $RM_CONFIG/tmp.ticket_list
-	fi
+	__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
+	jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
 fi
 
 IFS=$'\t'

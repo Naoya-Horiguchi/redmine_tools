@@ -34,7 +34,14 @@ END=$2
 
 START=$(date --date="$START" +%s)
 END=$(date --date="$END" +%s)
-echo "Clock during [$(date -d @$START), $(date -d @$END))"
+
+if [ ! "$START" ] || [ ! "$END" ] ; then
+	echo "invalid input" >&2
+	show_help
+	exit 1
+else
+	echo "Clock during [$(date -d @$START), $(date -d @$END))"
+fi
 
 generate_project_table PJTABLE
 declare -A clock_per_project
@@ -46,6 +53,10 @@ for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	id=$(basename $dir)
 
 	if [ "$id" == new ] || [ "$id" == null ] ; then
+		continue
+	fi
+
+	if [ "$(date -r $f +%s)" -lt "$START" ] ; then
 		continue
 	fi
 
