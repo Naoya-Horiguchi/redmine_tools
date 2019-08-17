@@ -62,6 +62,7 @@
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 . $THISDIR/utils.sh
+. $THISDIR/color.sh
 
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
