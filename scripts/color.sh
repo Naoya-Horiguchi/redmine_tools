@@ -1,0 +1,17 @@
+CL_BLACK='\033[0;30m'    # Black
+CL_RED='\033[0;31m'      # Red
+CL_GREEN='\033[0;32m'    # Green
+CL_ORANGE='\033[0;33m'   # Brown/Orange
+CL_BLUE='\033[0;34m'     # Blue
+CL_PURPLE='\033[0;35m'   # Purple
+CL_CYAN='\033[0;36m'     # Cyan
+CL_GRAY='\033[0;37m'     # Light Gray
+CL_DGRAY='\033[1;30m'    # Dark Gray
+CL_LRED='\033[1;31m'     # Light Red
+CL_LGREEN='\033[1;32m'   # Light Green
+CL_YELLOW='\033[1;33m'   # Yellow
+CL_LBLUE='\033[1;34m'    # Light Blue
+CL_LPURPLE='\033[1;35m'  # Light Purple
+CL_LCYAN='\033[1;36m'    # Light Cyan
+CL_WHITE='\033[1;37m'    # White
+CL_NC='\033[0m'          # No Color

@@ -327,6 +327,19 @@ keep_original_draft() {
 	cp $TMPD/$issueid/draft.md $TMPD/$issueid/tmp.draft.md
 }
 
+ask_done_ratio_update() {
+	local done_ratio="$(grep -i ^#\+doneratio: $TMPD/$issueid/tmp.draft.md | sed 's|^#+doneratio: *||i')"
+
+	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
+	if ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
+		echo -n "Update DoneRatio? ($done_ratio): "
+		read input
+		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
+			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $TMPD/$issueid/draft.md
+		fi
+	fi
+}
+
 edit_issue() {
 	local issueid=$1
 
@@ -336,6 +349,7 @@ edit_issue() {
 		else
 			$EDITOR $TMPD/$issueid/draft.md
 		fi
+		ask_done_ratio_update
 		diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
 		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
 			echo "no diff, so no need to upload"

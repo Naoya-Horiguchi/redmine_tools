@@ -1,0 +1,185 @@
+#!/bin/bash
+#
+# Usage
+#   redmine tree [options]
+#
+# Description
+#
+# Options
+#   -p            specify project
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+PROJECT=all
+EDIT=
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		-p)
+			PROJECT="$2"
+			shift 2
+			;;
+		-e)
+			EDIT=true
+			shift 1
+			;;
+		*)
+			# echo "invalid option $key"
+			;;
+	esac
+done
+
+DATA=$RM_CONFIG/issues.json
+
+TMPDIR=$(mktemp -d)
+
+declare -A SUBTASK_TABLE
+declare -A TRACKER_TABLE
+declare -A STATUS_TABLE
+declare -A SUBJECT_TABLE
+get_subtask_table() {
+	local data=$1
+
+	rm -f $TMPDIR/top_level_tasks
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ". | [.project.id, .id, .parent.id, .tracker.name, .status.name, .subject] | @tsv" $data | sort -k2n) ; do
+		local taskid=$(echo $line | cut -f2)
+		local parentid=$(echo $line | cut -f3)
+		if [ "$parentid" ] ; then
+			SUBTASK_TABLE[$parentid]="${SUBTASK_TABLE[$parentid]} $taskid"
+		else
+			echo $taskid >> $TMPDIR/top_level_tasks
+		fi
+		TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
+		STATUS_TABLE[$taskid]="$(echo $line | cut -f5)"
+		SUBJECT_TABLE[$taskid]="$(echo $line | cut -f6)"
+	done
+	IFS="$ifs"
+}
+
+get_relation_string() {
+	local tid=$1
+	local reltype=$2
+
+	case $reltype in
+		relates)
+			echo "-$tid"
+			;;
+		precedes)
+			echo ">$tid"
+			;;
+		blocks)
+			echo "|$tid"
+			;;
+		duplicates)
+			echo "=$tid"
+			;;
+		copied_to)
+			echo "#$tid"
+			;;
+		*)
+			echo "$FUNCNAME: invalid reltype: $reltype"
+			exit 1
+			;;
+	esac
+}
+
+declare -A RELATION_TABLE
+get_relation_table() {
+	local data=$1
+
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $data | sort -k1n | uniq) ; do
+		local issueid=$(echo $line | cut -f2)
+		local issuetoid=$(echo $line | cut -f3)
+		local reltype=$(echo $line | cut -f4)
+		local relstr="$(get_relation_string $issuetoid $reltype)"
+
+		if [ "${RELATION_TABLE[$issueid]}" ] ; then
+			RELATION_TABLE[$issueid]="${RELATION_TABLE[$issueid]},$relstr"
+		else
+			RELATION_TABLE[$issueid]="$relstr"
+		fi
+	done
+	IFS="$ifs"
+}
+
+get_relation_part() {
+	local taskid=$1
+
+	if [ "${RELATION_TABLE[$taskid]}" ] ; then
+		printf "(${CL_RED}${RELATION_TABLE[$taskid]}${CL_NC}) "
+	else
+		echo ""
+	fi
+}
+
+get_status_part() {
+	if [ "${STATUS_TABLE[$taskid]}" ] ; then
+		printf "<${CL_YELLOW}${STATUS_TABLE[$taskid]}${CL_NC}> "
+	else
+		echo ""
+	fi
+}
+
+show_task_subtree() {
+	local taskid=$1
+	local depth=$2
+	local childid=
+
+	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_status_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
+	for childid in ${SUBTASK_TABLE[$taskid]} ; do
+		show_task_subtree $childid $[depth+1]
+	done
+}
+
+find_top_level_task() {
+	local tid=
+
+	cat $TMPDIR/top_level_tasks | while read line ; do
+		show_task_subtree $line 1
+	done
+}
+
+# 関連タイプを取り出す。
+# jq -r ".issues[].relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $DATA | sort | uniq
+# jq -r ".relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $TMPDIR/pj15 | sort -k1n | uniq
+# jq -r ". | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $TMPDIR/pj15
+# head $TMPDIR/pj15
+# exit
+# jq -r ". | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $TMPDIR/pj15 | sort | uniq
+
+show_project_task_tree() {
+	local projectid=$1
+
+	jq ".issues[] | select(.project.id == $projectid)" $DATA > $TMPDIR/pj$projectid
+
+	get_subtask_table $TMPDIR/pj$projectid
+	get_relation_table $TMPDIR/pj$projectid
+	# echo ${!RELATION_TABLE[@]}
+	# echo ${RELATION_TABLE[*]}
+	find_top_level_task
+}
+
+jq -r ".issues[] | [.project.id, .project.name] | @tsv" $DATA | sort -k1n | uniq > $TMPDIR/projlist
+if [ "$PROJECT" != all ] ; then
+	grep -w "^$PROJECT" $TMPDIR/projlist > $TMPDIR/projlist2
+	cp $TMPDIR/projlist2 $TMPDIR/projlist
+fi
+
+cat $TMPDIR/projlist | while read projid projname ; do
+	printf "%-4s %s\n" "PJ$projid" "$projname" >> $TMPDIR/out
+	show_project_task_tree $projid >> $TMPDIR/out
+done
+
+cat $TMPDIR/out | expand

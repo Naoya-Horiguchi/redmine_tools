@@ -9,7 +9,9 @@
 #   -n limit      number of ticket to list (default: 25)
 #   -a user_id    filter ticket with given user (user ID or "me")
 #   -c            include closed tickets
+#   -N            don't download, just display from local caches
 #   -l            include local tickets
+#   -L            show local tickets only
 #   -A|--all      show all possible tickets
 #   -h            show this message
 #
@@ -33,6 +35,10 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		-c)
 			INCLUDE_CLOSED=true
+			shift
+			;;
+		-N)
+			NO_DOWNLOAD=true
 			shift
 			;;
 		-l)
@@ -96,7 +102,9 @@ if [ "$LIMIT" ] ; then
 fi
 
 if [ "$INCLUDE_LOCAL" != only ] ; then
-	__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
+	if [ ! "$NO_DOWNLOAD" ] ; then
+		__curl_limit "/issues.json" $RM_CONFIG/issues.json "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" $LIMIT
+	fi
 	jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
 fi
 
