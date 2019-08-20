@@ -679,6 +679,26 @@ get_conflict() {
 	diff -u /tmp/draft.md /tmp/sdf.tmp
 }
 
+update_local_cache() {
+	local data="$1"
+
+	if [ -s "$RM_LAST_DOWNLOAD" ] ; then
+		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 || return 1
+		jq -r ".issues[]" $RM_CONFIG/tmp.issues.json > $RM_CONFIG/tmp.new_items
+		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.issues.json)"
+		if [ "$total_count" -gt 0 ] ; then
+			jq -r --slurpfile new_items $RM_CONFIG/tmp.new_items \
+			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $RM_CONFIG/issues.json.tmp || return 1
+			mv $RM_CONFIG/issues.json.tmp $RM_CONFIG/issues.json
+		else
+			echo "local cache is up-to-date"
+		fi
+	else
+		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 || return 1
+	fi
+	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
+}
+
 if [ ! "$RM_BASEURL" ] ; then
 	echo you need setup RM_BASEURL/RM_KEY
 	exit 1
