@@ -47,7 +47,7 @@ generate_project_table PJTABLE
 declare -A clock_per_project
 
 totalclock=0
-rm $RM_CONFIG/tmp.clock_summary 2> /dev/null
+echo "" > $RM_CONFIG/tmp.clock_summary
 for f in $(find $RM_CONFIG/edit_memo -name .clock.log) ; do
 	dir=$(dirname $f)
 	id=$(basename $dir)
@@ -107,7 +107,7 @@ done
 
 TMPF=$(mktemp)
 
-rm -f $RM_CONFIG/tmp.proj_clock_summary
+echo "" > $RM_CONFIG/tmp.proj_clock_summary
 for proj in ${!clock_per_project[@]} ; do
 	[ "${clock_per_project[$proj]}" -lt 60 ] && continue
 	echo -e " \t$[${clock_per_project[$proj]}/60]\t$proj" >> $RM_CONFIG/tmp.proj_clock_summary
