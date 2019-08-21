@@ -680,7 +680,7 @@ get_conflict() {
 }
 
 update_local_cache() {
-	local data="$1"
+	local data="${ASSIGNED_OPT}&status_id=*&include=relations&sort=updated_on:desc"
 
 	if [ -s "$RM_LAST_DOWNLOAD" ] ; then
 		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 || return 1

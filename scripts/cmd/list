@@ -8,9 +8,7 @@
 #   - -A オプションを与えるとサーバの最新データをローカルキャッシュにコピー
 #
 # Options
-#   -n limit      number of ticket to list (default: 25)
 #   -a user_id    filter ticket with given user (user ID or "me")
-#   -c            include closed tickets
 #   -A|--all      show all possible tickets
 #   -h            show this message
 #
@@ -22,27 +20,16 @@ show_help() {
 [ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
 [ ! "$LIMIT" ] && LIMIT=25
 RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
-ALL_DOWNLOAD=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
-		-n)
-			LIMIT="$2"
-			shift 2
-			;;
 		-a)
 			ASSIGNED="$2"
 			ASSIGNED_OPT="&assigned_to_id=$ASSIGNED"
 			shift 2
 			;;
-		-c)
-			INCLUDE_CLOSED=true
-			shift
-			;;
 		-A|--all)
-			ALL_DOWNLOAD=true
 			LIMIT=10000
-			INCLUDE_CLOSED=true
 			shift
 			;;
 		-h)
@@ -55,11 +42,6 @@ while [[ $# -gt 0 ]] ; do
 			;;
 	esac
 done
-
-if [ "$INCLUDE_CLOSED" ] ; then
-	echo "include closed tickets"
-	STATUS_OPT="&status_id=*"
-fi
 
 rm $RM_CONFIG/tmp.local_ticket_list 2> /dev/null
 
@@ -78,15 +60,8 @@ for ltck in $(get_local_ticket_list) ; do
 	[ ! "$status" ] && status=null
 	echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
 done
-if [ ! "$INCLUDE_CLOSED" ] ; then
-	sed -i '/\tClosed\t/d' $RM_CONFIG/tmp.local_ticket_list
-fi
 
-if [ "$LIMIT" ] ; then
-	LIMIT_OPT="&limit=$LIMIT"
-fi
-
-update_local_cache "${STATUS_OPT}${ASSIGNED_OPT}&include=relations&sort=updated_on:desc" || exit 1
+update_local_cache || exit 1
 
 jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
 
