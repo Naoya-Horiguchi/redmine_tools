@@ -47,6 +47,8 @@ if [[ "$ISSUEID" =~ ^L ]] ; then
 	exit
 fi
 
+update_local_cache || exit 1
+
 # TODO: better file name
 tmpjson=$TMPD/$ISSUEID/issue.json
 tmpfile=$TMPD/$ISSUEID/draft.md

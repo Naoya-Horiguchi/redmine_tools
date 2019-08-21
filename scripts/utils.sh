@@ -679,6 +679,8 @@ get_conflict() {
 	diff -u /tmp/draft.md /tmp/sdf.tmp
 }
 
+RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
+
 update_local_cache() {
 	local data="${ASSIGNED_OPT}&status_id=*&include=relations&sort=updated_on:desc"
 

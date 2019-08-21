@@ -19,7 +19,6 @@ show_help() {
 
 [ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
 [ ! "$LIMIT" ] && LIMIT=25
-RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
