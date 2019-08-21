@@ -332,11 +332,14 @@ ask_done_ratio_update() {
 
 	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
 	if ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
+		[ "$done_ratio" -eq 100 ] && return
 		echo -n "Update DoneRatio? ($done_ratio): "
 		read input
 		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
 			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $TMPD/$issueid/draft.md
 		fi
+
+		# TODO: Status change caused by done_ratio update
 	fi
 }
 
@@ -677,6 +680,28 @@ get_conflict() {
 	awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' $draftfile > /tmp/draft.md
 
 	diff -u /tmp/draft.md /tmp/sdf.tmp
+}
+
+RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
+
+update_local_cache() {
+	local data="${ASSIGNED_OPT}&status_id=*&include=relations&sort=updated_on:desc"
+
+	if [ -s "$RM_LAST_DOWNLOAD" ] ; then
+		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 || return 1
+		jq -r ".issues[]" $RM_CONFIG/tmp.issues.json > $RM_CONFIG/tmp.new_items
+		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.issues.json)"
+		if [ "$total_count" -gt 0 ] ; then
+			jq -r --slurpfile new_items $RM_CONFIG/tmp.new_items \
+			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $RM_CONFIG/issues.json.tmp || return 1
+			mv $RM_CONFIG/issues.json.tmp $RM_CONFIG/issues.json
+		else
+			echo "local cache is up-to-date" >&2
+		fi
+	else
+		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 || return 1
+	fi
+	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 }
 
 if [ ! "$RM_BASEURL" ] ; then

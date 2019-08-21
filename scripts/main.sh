@@ -12,6 +12,7 @@
 #   -e editor       your text editor (EDITOR)
 #   --insecure      skip verification of the certificate for HTTPS connection (INSECURE)
 #   --legend        open with EDITOR with legend list aside from draft.md (RM_LEGEND)
+#   --color         display with colored output
 #
 # Subcommands:
 #   list [options]
@@ -40,6 +41,8 @@
 #   update [options]                         # get some info (like projects, versions
 #                                            # users) to local cache
 #
+#   tree [options]  show project/ticket info in tree format
+#
 # Planned features:
 #   - convert local ticket to RedMine ticket (and vice versa)
 #   - handle attachment
@@ -51,9 +54,7 @@
 #   - support local RedMine (using docker)
 #   - status change if done_ratio is changed
 #   - create sub-ticket or related ticket from a given ticket
-#   - notify if the ticket is already open
 #   - show message about added clocks
-#   - add mode in which opened ticket list or ticket with browser
 #   - show figures in description with attachment url
 #   - sanitize invalid ticket status
 #   - implement "report" command to construct report from given set of ticket
@@ -62,7 +63,6 @@
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 . $THISDIR/utils.sh
-. $THISDIR/color.sh
 
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
@@ -100,6 +100,10 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		--legend)
 			RM_LEGEND=true
+			shift 1
+			;;
+		--color)
+			. $THISDIR/color.sh
 			shift 1
 			;;
 		*) # end of global options

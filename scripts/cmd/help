@@ -12,6 +12,7 @@
 #   -e editor       your text editor (EDITOR)
 #   --insecure      skip verification of the certificate for HTTPS connection (INSECURE)
 #   --legend        open with EDITOR with legend list aside from draft.md (RM_LEGEND)
+#   --color         display with colored output
 #
 
 show_help() {
