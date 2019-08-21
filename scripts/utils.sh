@@ -332,11 +332,14 @@ ask_done_ratio_update() {
 
 	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
 	if ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
+		[ "$done_ratio" -eq 100 ] && return
 		echo -n "Update DoneRatio? ($done_ratio): "
 		read input
 		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
 			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $TMPD/$issueid/draft.md
 		fi
+
+		# TODO: Status change caused by done_ratio update
 	fi
 }
 
@@ -693,7 +696,7 @@ update_local_cache() {
 			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $RM_CONFIG/issues.json.tmp || return 1
 			mv $RM_CONFIG/issues.json.tmp $RM_CONFIG/issues.json
 		else
-			echo "local cache is up-to-date"
+			echo "local cache is up-to-date" >&2
 		fi
 	else
 		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 || return 1
