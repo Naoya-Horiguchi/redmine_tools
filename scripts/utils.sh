@@ -331,7 +331,7 @@ ask_done_ratio_update() {
 	local done_ratio="$(grep -i ^#\+doneratio: $TMPD/$issueid/tmp.draft.md | sed 's|^#+doneratio: *||i')"
 
 	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
-	if ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
+	if [ -s $TMPD/$issueid/edit.diff ] && ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
 		[ "$done_ratio" -eq 100 ] && return
 		echo -n "Update DoneRatio? ($done_ratio): "
 		read input
@@ -485,33 +485,24 @@ upload_issue() {
 }
 
 create_issue() {
-	local issueid=$1
+	# issueid is defined in caller update_issue()
 	local tmpfile=$TMPD/$issueid/draft.md
 
 	mkdir -p $TMPD/$issueid
 	[ "$VERBOSE" ] && echo "create_ticket"
 	create_ticket $tmpfile $issueid > $TMPD/$issueid/tmp.issue.json
 	cat $TMPD/$issueid/tmp.issue.json
-	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
-	[[ "$issueid" =~ ^L ]] && return 0
-	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
-	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
-	[ "$VERBOSE" ] && echo update_relations $issueid
-	update_relations "$issueid" new || return 1
-	return 0
 
 	[[ "$issueid" =~ ^L ]] && return 0
-	# TODO: update_local_data
 	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
 	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
+	mv $TMPD/new/ $TMPD/$issueid/
+	[ "$VERBOSE" ] && echo update_relations $issueid
+	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
+	# update_relations "$issueid" new || return 1
+	return 0
 	# TODO: 複数 issue の作成がコンフリクトしうる、そもそもローカルキャッシュなので
 	# new をリネームする必要は薄いと思われる。
-	# TODO: クロック関連の処理が怪しくなるのでリネームはクロック処理が終わった後にすべき。
-	rsync -a $TMPD/new/ $TMPD/$issueid/
-	# fetch_issue "$issueid" "" "$TMPD/$issueid/issue.json"
-	jq ".issue" $TMPD/$issueid/tmp.issue.json > $TMPD/$issueid/issue.json || return 1
-	[ "$VERBOSE" ] && echo update_relations $issueid
-	update_relations "$issueid" new || return 1
 }
 
 prepare_draft_file() {
@@ -563,19 +554,30 @@ __check_opened() {
 	fi
 }
 
+__open_clock() {
+	local issueid=$1
+	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
+}
+
+__close_clock() {
+	local issueid=$1
+	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+}
+
 update_issue() {
 	local issueid=$1
 
 	__check_opened $issueid || return 1
 
-	CLOCK_START=$(date --iso-8601=seconds)
-	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
+	__open_clock $issueid
+	trap "__close_clock $issueid" 2
 	while true ; do
 		edit_issue $issueid || break
 		[[ "$issueid" =~ ^L ]] && break
 		__curl "/issues.json" $TMPD/$issueid/tmp.after_edit "issue_id=$issueid"
 
 		if [ "$issueid" == new ] ; then
+			# issueid will be update from "new" to generated ID
 			create_issue $issueid && break
 			echo "create_issue failed, check draft.md and/or network connection."
 			echo "type any key to open editor again."
@@ -603,7 +605,7 @@ update_issue() {
 			fi
 		fi
 	done
-	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+	__close_clock $issueid
 }
 
 declare -A PJTABLE;
