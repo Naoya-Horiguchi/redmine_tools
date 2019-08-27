@@ -331,7 +331,7 @@ ask_done_ratio_update() {
 	local done_ratio="$(grep -i ^#\+doneratio: $TMPD/$issueid/tmp.draft.md | sed 's|^#+doneratio: *||i')"
 
 	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
-	if ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
+	if [ -s $TMPD/$issueid/edit.diff ] && ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
 		[ "$done_ratio" -eq 100 ] && return
 		echo -n "Update DoneRatio? ($done_ratio): "
 		read input
