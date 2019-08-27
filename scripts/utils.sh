@@ -554,13 +554,23 @@ __check_opened() {
 	fi
 }
 
+__open_clock() {
+	local issueid=$1
+	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
+}
+
+__close_clock() {
+	local issueid=$1
+	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+}
+
 update_issue() {
 	local issueid=$1
 
 	__check_opened $issueid || return 1
 
-	CLOCK_START=$(date --iso-8601=seconds)
-	echo -n "$CLOCK_START " >> $TMPD/$issueid/.clock.log
+	__open_clock $issueid
+	trap "__close_clock $issueid" 2
 	while true ; do
 		edit_issue $issueid || break
 		[[ "$issueid" =~ ^L ]] && break
@@ -595,7 +605,7 @@ update_issue() {
 			fi
 		fi
 	done
-	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+	__close_clock $issueid
 }
 
 declare -A PJTABLE;
