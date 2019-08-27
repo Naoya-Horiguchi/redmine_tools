@@ -43,6 +43,8 @@ if ! check_ticket_id_format $ISSUEID ; then
 	exit 1
 fi
 
+update_local_cache || exit 1
+
 mkdir -p $TMPD/$ISSUEID
 prepare_draft_file $ISSUEID || exit 1
 update_issue $ISSUEID || exit 1
