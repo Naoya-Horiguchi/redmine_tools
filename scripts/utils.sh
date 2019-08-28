@@ -583,6 +583,7 @@ __open_clock() {
 
 __close_clock() {
 	local issueid=$1
+	trap 2
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
 
@@ -592,7 +593,7 @@ update_issue() {
 	__check_opened $issueid || return 1
 
 	__open_clock $issueid
-	trap "__close_clock $issueid" 2
+	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
 		edit_issue $issueid || break
 		[[ "$issueid" =~ ^L ]] && break
