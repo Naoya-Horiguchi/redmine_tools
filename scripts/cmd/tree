@@ -36,11 +36,18 @@ while [[ $# -gt 0 ]] ; do
 			EDIT=true
 			shift 1
 			;;
+		-o)
+			HIDE_CLOSED=true
+			shift 1
+			;;
 		*)
 			# echo "invalid option $key"
 			;;
 	esac
 done
+
+# only colors for terminal output
+[ ! "$EDIT" ] && [ -t 1 ] && . $THISDIR/color.sh
 
 DATA=$RM_CONFIG/issues.json
 
@@ -111,6 +118,8 @@ get_project_table() {
 }
 
 get_tracker_part() {
+	local taskid=$1
+
 	if [ "${STATUS_TABLE[$taskid]}" ] ; then
 		printf "${CL_GREEN}${TRACKER_TABLE[$taskid]}${CL_NC}"
 	else
@@ -119,6 +128,8 @@ get_tracker_part() {
 }
 
 get_status_part() {
+	local taskid=$1
+
 	if [ "${STATUS_TABLE[$taskid]}" ] ; then
 		if status_closed "${STATUS_TABLE[$taskid]}" ; then
 			printf "${CL_DGRAY}${STATUS_TABLE[$taskid]}${CL_NC}"
@@ -148,7 +159,11 @@ show_task_subtree() {
 	local depth=$2
 	local childid=
 
-	# printf "%$[depth*2]s%-4s %s%s%s%s\n" "" "$taskid" "$(get_tracker_part $taskid)" "$(get_status_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
+	if [ "$HIDE_CLOSED" ] ; then
+		if status_closed "${STATUS_TABLE[$taskid]}" ; then
+			return 0
+		fi
+	fi
 	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_meta_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
 	for childid in ${SUBTASK_TABLE[$taskid]} ; do
 		show_task_subtree $childid $[depth+1]
