@@ -63,7 +63,13 @@
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 . $THISDIR/utils.sh
+. $THISDIR/relations.sh
 
+mkdir -p /tmp/redmine_cli
+TMPDIR=$(mktemp -d /tmp/redmine_cli/tmp.XXXXXX)
+echo "redmine $*" > $TMPDIR/cmd
+
+# TODO: rename this
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
 

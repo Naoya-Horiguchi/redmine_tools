@@ -105,12 +105,19 @@ __update_ticket() {
 	if [ "$version_id" ] ; then
 		json_add_int $TMPD/$issue/upload.json .issue.fixed_version_id $version_id || return 1
 	fi
+	# TODO: check '"' is escaped properly
 	if [ -s "$TMPD/$issue/body" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
 	fi
 	if [ -s "$TMPD/$issue/note" ] ; then
 		json_add_text $TMPD/$issue/upload.json .issue.notes "$(cat $TMPD/$issue/note)" || return 1
 	fi
+}
+
+__create_ticket() {
+	local file=$1
+
+	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X POST --data-binary "@${file}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
 }
 
 create_ticket() {
@@ -121,7 +128,14 @@ create_ticket() {
 		echo "json to be uploaded"
 		cat $TMPD/$issueid/upload.json
 	fi
-	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X POST --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
+	__create_ticket $TMPD/$issueid/upload.json || return 1
+}
+
+__upload_ticket() {
+	local file=$1
+	local issueid=$2
+
+	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@${file}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
 upload_ticket() {
@@ -132,7 +146,7 @@ upload_ticket() {
 		echo "json to be uploaded"
 		cat $TMPD/$issueid/upload.json
 	fi
-	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
+	__upload_ticket $TMPD/$issueid/upload.json $issueid
 }
 
 __curl_limit() {
