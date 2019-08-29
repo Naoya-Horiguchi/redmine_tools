@@ -376,7 +376,7 @@ edit_issue() {
 		[[ "$issueid" =~ ^L ]] && return 0
 		[ "$LOCALTICKET" ] && return 0 # new local ticket
 		echo
-		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
+		echo "You really upload this change? (y: yes, n: no, e: edit again)"
 		read input
 		if [ "$input" == y ] || [ "$input" == Y ] ; then
 			return 0
@@ -501,6 +501,7 @@ upload_issue() {
 create_issue() {
 	# issueid is defined in caller update_issue()
 	local tmpfile=$TMPD/$issueid/draft.md
+	local tmpissueid=
 
 	mkdir -p $TMPD/$issueid
 	[ "$VERBOSE" ] && echo "create_ticket"
@@ -508,9 +509,16 @@ create_issue() {
 	cat $TMPD/$issueid/tmp.issue.json
 
 	[[ "$issueid" =~ ^L ]] && return 0
-	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
-	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
-	mv $TMPD/new/ $TMPD/$issueid/
+	tmpissueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
+	[ "$tmpissueid" == null ] && echo "failed to get new ticket ID" && return 1
+	# switch issueid from "new" to "read ID"
+	echo "renaming $TMPD/$issueid/ $TMPD/$tmpissueid/"
+	rsync -a $TMPD/$issueid/ $TMPD/$tmpissueid/
+	if [ "$issueid" = new ] ; then
+		echo "clean up new/ draft folder"
+		rm -rf $TMPD/new
+	fi
+	issueid=$tmpissueid
 	[ "$VERBOSE" ] && echo update_relations $issueid
 	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
 	# update_relations "$issueid" new || return 1
