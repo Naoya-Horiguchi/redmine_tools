@@ -188,6 +188,7 @@ show_task_tree() {
 # exit
 # jq -r ". | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $TMPDIR/pj15 | sort | uniq
 
+# TODO: プロジェクト内のタスクの表示順序、関連がなければ ID 順、あればそれに応じた順番に並べることになる。
 show_project_task_tree() {
 	local projectid=$1
 	local depth=$2
@@ -248,8 +249,8 @@ parse_new_line() {
 	local tracker="$(echo $metafield | cut -f1 -d\|)"
 	local status="$(echo $metafield | cut -f2 -d\|)"
 	# TODO: 不完全、タイトルの先頭に () がある場合と区別できないといけない
-	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/' | tr ',' ' ')"
-	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/' | tr ',' ' ')"
+	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
 	local newrel="$(echo "$newline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
 	local newrel2=
 	local oldrel="$(echo "$oldline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
@@ -265,6 +266,7 @@ parse_new_line() {
 
 	# TODO: 不完全、関連がある場合に区別できない
 	# TODO: changes on relationship don't change update_on of the related issues
+	# <2019-08-29 Thu 10:30> なぜか newrelations/newline が同じなのにこの if 分に入ることがある。カンマが怪しい
 	if [ "$newrelations" != "$newline" ] ; then
 		local subject="$(echo $newline | cut -f2- -d \) | sed 's/^ *//')"
 
