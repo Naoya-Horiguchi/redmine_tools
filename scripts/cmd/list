@@ -12,10 +12,14 @@
 #   -A|--all      show all possible tickets
 #   -h            show this message
 #
+# TODO:
+#   - too slow
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
+
+. $THISDIR/server_specific_layer.sh
 
 [ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
 [ ! "$LIMIT" ] && LIMIT=25
@@ -42,6 +46,8 @@ while [[ $# -gt 0 ]] ; do
 	esac
 done
 
+[ -t 1 ] && . $THISDIR/color.sh
+
 rm $RM_CONFIG/tmp.local_ticket_list 2> /dev/null
 
 generate_project_table PJTABLE
@@ -56,17 +62,24 @@ for ltck in $(get_local_ticket_list) ; do
 		project=${PJTABLE[$project]}
 	fi
 	status="$(grep -i ^#\+status: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+status: *||i')"
+	if status_closed "$status" ; then
+		status="<${CL_BLUE}Local${CL_NC}|${CL_DGRAY}$status${CL_NC}>"
+	else
+		status="<${CL_BLUE}Local${CL_NC}|${CL_YELLOW}$status${CL_NC}>"
+	fi
+
 	[ ! "$status" ] && status=null
 	echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
 done
 
 update_local_cache || exit 1
 
-jq -r -c '.issues[] | [.id, .updated_on, .project.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json > $RM_CONFIG/tmp.ticket_list
+# get_metadata_table $RM_CONFIG/issues.json
 
 IFS=$'\t'
-while read id update pjname status subj ; do
-	echo -e "$id\t$(date -d $update +%y%m%d_%H%M)\t$pjname\t$status\t$subj"
-done < "$RM_CONFIG/tmp.ticket_list" > $RM_CONFIG/tmp.remote_ticket_list
+jq -r -c '.issues[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json | sort -k2 | tail -n $LIMIT | while read id update project tracker status subject ; do
+#	printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "$(get_meta_part $id)" "$subject"
+	printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+done > $RM_CONFIG/tmp.remote_ticket_list
 
 cat $RM_CONFIG/tmp.remote_ticket_list $RM_CONFIG/tmp.local_ticket_list | sort -k2 | column -t -s $'\t' | tail -n $LIMIT

@@ -51,52 +51,6 @@ done
 
 DATA=$RM_CONFIG/issues.json
 
-declare -A SUBTASK_TABLE
-declare -A TRACKER_TABLE
-declare -A STATUS_TABLE
-declare -A SUBJECT_TABLE
-get_subtask_table() {
-	local data=$1
-
-	echo -n "" > $TMPDIR/top_level_tasks
-	local ifs="$IFS"
-	IFS=$'\n'
-	for line in $(jq -r ". | [.project.id, .id, .parent.id, .tracker.name, .status.name, .subject] | @tsv" $data | sort -k2n) ; do
-		local taskid=$(echo $line | cut -f2)
-		local parentid=$(echo $line | cut -f3)
-		if [ "$parentid" ] ; then
-			SUBTASK_TABLE[$parentid]="${SUBTASK_TABLE[$parentid]} $taskid"
-		else
-			echo $taskid >> $TMPDIR/top_level_tasks
-		fi
-		TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
-		STATUS_TABLE[$taskid]="$(echo $line | cut -f5)"
-		SUBJECT_TABLE[$taskid]="$(echo $line | cut -f6)"
-	done
-	IFS="$ifs"
-}
-
-declare -A RELATION_TABLE
-get_relation_table() {
-	local data=$1
-
-	local ifs="$IFS"
-	IFS=$'\n'
-	for line in $(jq -r ".relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $data | sort -k1n | uniq) ; do
-		local issueid=$(echo $line | cut -f2)
-		local issuetoid=$(echo $line | cut -f3)
-		local reltype=$(echo $line | cut -f4)
-		local relstr="$(get_relation_string $issuetoid $reltype)"
-
-		if [ "${RELATION_TABLE[$issueid]}" ] ; then
-			RELATION_TABLE[$issueid]="${RELATION_TABLE[$issueid]},$relstr"
-		else
-			RELATION_TABLE[$issueid]="$relstr"
-		fi
-	done
-	IFS="$ifs"
-}
-
 declare -A SUBPJ_TABLE
 get_project_table() {
 	local data=$1
@@ -115,43 +69,6 @@ get_project_table() {
 		# TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
 	done
 	IFS="$ifs"
-}
-
-get_tracker_part() {
-	local taskid=$1
-
-	if [ "${STATUS_TABLE[$taskid]}" ] ; then
-		printf "${CL_GREEN}${TRACKER_TABLE[$taskid]}${CL_NC}"
-	else
-		echo "-"
-	fi
-}
-
-get_status_part() {
-	local taskid=$1
-
-	if [ "${STATUS_TABLE[$taskid]}" ] ; then
-		if status_closed "${STATUS_TABLE[$taskid]}" ; then
-			printf "${CL_DGRAY}${STATUS_TABLE[$taskid]}${CL_NC}"
-		else
-			printf "${CL_YELLOW}${STATUS_TABLE[$taskid]}${CL_NC}"
-		fi
-	else
-		echo "-"
-	fi
-}
-
-get_relation_part() {
-	local taskid=$1
-
-	if [ "${RELATION_TABLE[$taskid]}" ] ; then
-		printf "(${CL_RED}${RELATION_TABLE[$taskid]}${CL_NC}) "
-	fi
-}
-
-get_meta_part() {
-	# printf "<${CL_GREEN}${TRACKER_TABLE[$taskid]}|${STATUS_TABLE[$taskid]}${CL_NC}> "
-	printf "<$(get_tracker_part "$1")|$(get_status_part "$1")> "
 }
 
 show_task_subtree() {
@@ -266,7 +183,6 @@ parse_new_line() {
 
 	# TODO: 不完全、関連がある場合に区別できない
 	# TODO: changes on relationship don't change update_on of the related issues
-	# <2019-08-29 Thu 10:30> なぜか newrelations/newline が同じなのにこの if 分に入ることがある。カンマが怪しい
 	if [ "$newrelations" != "$newline" ] ; then
 		local subject="$(echo $newline | cut -f2- -d \) | sed 's/^ *//')"
 
