@@ -388,10 +388,10 @@ update_local_cache() {
 }
 
 # WIP
-+# TODO: ticket remove
-+# TODO: relations are not updated automatically
-+# TODO: download server data in background
-+# TODO: update locking
+# TODO: ticket remove
+# TODO: relations are not updated automatically
+# TODO: download server data in background
+# TODO: update locking
 update_local_cache_task() {
 	local id="$1"
 
