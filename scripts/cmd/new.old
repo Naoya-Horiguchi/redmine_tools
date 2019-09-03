@@ -32,8 +32,11 @@ while [[ $# -gt 0 ]] ; do
 done
 
 if [ "$LOCALTICKET" ] ; then
-	NEWLOCALTID="$(generate_local_ticket_id)"
+	ISSUEID="$(generate_local_ticket_id)"
+else
+	ISSUEID=new
 fi
 
-generate_issue_template2 || exit 1
-update_new_issue
+mkdir -p $TMPD/$ISSUEID
+prepare_draft_file $ISSUEID || exit 1
+update_issue $ISSUEID || exit 1

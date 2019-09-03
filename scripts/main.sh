@@ -11,8 +11,6 @@
 #   -f format       markup language used by the RedMine (textile or markdown: RM_FORMAT)
 #   -e editor       your text editor (EDITOR)
 #   --insecure      skip verification of the certificate for HTTPS connection (INSECURE)
-#   --legend        open with EDITOR with legend list aside from draft.md (RM_LEGEND)
-#   --color         display with colored output
 #
 # Subcommands:
 #   list [options]
@@ -60,10 +58,16 @@
 #   - implement "report" command to construct report from given set of ticket
 #
 
+mkdir -p /tmp/redmine_cli
+TMPDIR=$(mktemp -d /tmp/redmine_cli/tmp.XXXXXX)
+echo "redmine $*" > $TMPDIR/cmd
+
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 . $THISDIR/utils.sh
+. $THISDIR/relations.sh
 
+# TODO: rename this
 TMPD=$RM_CONFIG/edit_memo
 mkdir -p $TMPD
 
@@ -96,14 +100,6 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		--insecure)
 			INSECURE=true
-			shift 1
-			;;
-		--legend)
-			RM_LEGEND=true
-			shift 1
-			;;
-		--color)
-			. $THISDIR/color.sh
 			shift 1
 			;;
 		*) # end of global options

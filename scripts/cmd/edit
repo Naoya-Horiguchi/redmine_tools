@@ -10,6 +10,8 @@
 #   -n            no download and edit with local cache (NO_DOWNLOAD)
 #   -h            show this message
 #
+# TODO:
+#  - local ticket の場合、upload 処理が $RM_CONFIG/edit_memo 配下にアップロードすることとする。
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
@@ -43,8 +45,11 @@ if ! check_ticket_id_format $ISSUEID ; then
 	exit 1
 fi
 
+if [[ "$ISSUEID" =~ ^L ]] ; then
+	edit_local_ticket $ISSUEID
+	exit 0
+fi
+
 update_local_cache || exit 1
 
-mkdir -p $TMPD/$ISSUEID
-prepare_draft_file $ISSUEID || exit 1
-update_issue $ISSUEID || exit 1
+update_issue3 $ISSUEID

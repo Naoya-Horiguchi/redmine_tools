@@ -11,11 +11,13 @@
 #
 # TODO:
 #  - project summary tree (# of tasks for each status, tracker)
-#  - update local cache and project info before display
+#  - switch to hide "closed" tickets
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
+
+. $THISDIR/server_specific_layer.sh
 
 PROJECT=all
 EDIT=
@@ -34,88 +36,20 @@ while [[ $# -gt 0 ]] ; do
 			EDIT=true
 			shift 1
 			;;
+		-o)
+			HIDE_CLOSED=true
+			shift 1
+			;;
 		*)
 			# echo "invalid option $key"
 			;;
 	esac
 done
 
+# only colors for terminal output
+[ ! "$EDIT" ] && [ -t 1 ] && . $THISDIR/color.sh
+
 DATA=$RM_CONFIG/issues.json
-
-TMPDIR=$(mktemp -d)
-
-declare -A SUBTASK_TABLE
-declare -A TRACKER_TABLE
-declare -A STATUS_TABLE
-declare -A SUBJECT_TABLE
-get_subtask_table() {
-	local data=$1
-
-	echo -n "" > $TMPDIR/top_level_tasks
-	local ifs="$IFS"
-	IFS=$'\n'
-	for line in $(jq -r ". | [.project.id, .id, .parent.id, .tracker.name, .status.name, .subject] | @tsv" $data | sort -k2n) ; do
-		local taskid=$(echo $line | cut -f2)
-		local parentid=$(echo $line | cut -f3)
-		if [ "$parentid" ] ; then
-			SUBTASK_TABLE[$parentid]="${SUBTASK_TABLE[$parentid]} $taskid"
-		else
-			echo $taskid >> $TMPDIR/top_level_tasks
-		fi
-		TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
-		STATUS_TABLE[$taskid]="$(echo $line | cut -f5)"
-		SUBJECT_TABLE[$taskid]="$(echo $line | cut -f6)"
-	done
-	IFS="$ifs"
-}
-
-get_relation_string() {
-	local tid=$1
-	local reltype=$2
-
-	case $reltype in
-		relates)
-			echo "-$tid"
-			;;
-		precedes)
-			echo ">$tid"
-			;;
-		blocks)
-			echo "|$tid"
-			;;
-		duplicates)
-			echo "=$tid"
-			;;
-		copied_to)
-			echo "#$tid"
-			;;
-		*)
-			echo "$FUNCNAME: invalid reltype: $reltype"
-			exit 1
-			;;
-	esac
-}
-
-declare -A RELATION_TABLE
-get_relation_table() {
-	local data=$1
-
-	local ifs="$IFS"
-	IFS=$'\n'
-	for line in $(jq -r ".relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $data | sort -k1n | uniq) ; do
-		local issueid=$(echo $line | cut -f2)
-		local issuetoid=$(echo $line | cut -f3)
-		local reltype=$(echo $line | cut -f4)
-		local relstr="$(get_relation_string $issuetoid $reltype)"
-
-		if [ "${RELATION_TABLE[$issueid]}" ] ; then
-			RELATION_TABLE[$issueid]="${RELATION_TABLE[$issueid]},$relstr"
-		else
-			RELATION_TABLE[$issueid]="$relstr"
-		fi
-	done
-	IFS="$ifs"
-}
 
 declare -A SUBPJ_TABLE
 get_project_table() {
@@ -137,30 +71,17 @@ get_project_table() {
 	IFS="$ifs"
 }
 
-get_relation_part() {
-	local taskid=$1
-
-	if [ "${RELATION_TABLE[$taskid]}" ] ; then
-		printf "(${CL_RED}${RELATION_TABLE[$taskid]}${CL_NC}) "
-	else
-		echo ""
-	fi
-}
-
-get_status_part() {
-	if [ "${STATUS_TABLE[$taskid]}" ] ; then
-		printf "<${CL_YELLOW}${STATUS_TABLE[$taskid]}${CL_NC}> "
-	else
-		echo ""
-	fi
-}
-
 show_task_subtree() {
 	local taskid=$1
 	local depth=$2
 	local childid=
 
-	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_status_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
+	if [ "$HIDE_CLOSED" ] ; then
+		if status_closed "${STATUS_TABLE[$taskid]}" ; then
+			return 0
+		fi
+	fi
+	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_meta_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
 	for childid in ${SUBTASK_TABLE[$taskid]} ; do
 		show_task_subtree $childid $[depth+1]
 	done
@@ -184,6 +105,7 @@ show_task_tree() {
 # exit
 # jq -r ". | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $TMPDIR/pj15 | sort | uniq
 
+# TODO: プロジェクト内のタスクの表示順序、関連がなければ ID 順、あればそれに応じた順番に並べることになる。
 show_project_task_tree() {
 	local projectid=$1
 	local depth=$2
@@ -229,10 +151,133 @@ show_project_tree() {
 	__show_task_subproject $pjid 0
 }
 
-# jq -r "." $RM_CONFIG/projects.json
+diff_check() {
+	local id=$1
+	local diff=$2
+	local before=
+	grep -e "^+ *$"
+}
+
+parse_new_line() {
+	local issueid=$1
+	local newline="$2"
+	local oldline="$3"
+	local metafield="$(echo "$newline" | awk -F'[><]' '{print $2}')"
+	local tracker="$(echo $metafield | cut -f1 -d\|)"
+	local status="$(echo $metafield | cut -f2 -d\|)"
+	# TODO: 不完全、タイトルの先頭に () がある場合と区別できないといけない
+	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	local newrel="$(echo "$newline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
+	local newrel2=
+	local oldrel="$(echo "$oldline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
+	local oldrel2=
+
+	local subject="$(echo "$newline" | cut -f2- -d \> | sed 's/^ *//')"
+
+	# echo "newrelations: [$newrelations]"
+	# echo "newline: [$newline]"
+	# echo "oldrelations: $oldrelations"
+	# echo "oldline: $oldline"
+	# echo "subject: $subject"
+
+	# TODO: 不完全、関連がある場合に区別できない
+	# TODO: changes on relationship don't change update_on of the related issues
+	if [ "$newrelations" != "$newline" ] ; then
+		local subject="$(echo $newline | cut -f2- -d \) | sed 's/^ *//')"
+
+		# ignore unchanged relation
+		for rel in $newrel ; do
+			if echo "$oldrel" | grep -q -w "$rel" ; then
+				continue
+			fi
+			newrel2="$newrel2 $rel"
+		done
+		echo "new relations: $newrel2"
+
+		for relstring in $newrel2 ; do
+			generate_relation_json "$issueid" "$relstring" > $TMPDIR/upload_relation.json
+			create_relation $issueid $TMPDIR/upload_relation.json || exit 1
+		done
+	fi
+
+	if [ "$oldrelations" != "$oldline" ] ; then
+		for rel in $oldrel ; do
+			if echo "$newrel" | grep -q -w "$rel" ; then
+				continue
+			fi
+			oldrel2="$oldrel2 $rel"
+		done
+		echo "old relations: $oldrel2"
+
+		for relstring in $oldrel2 ; do
+			local relid=$(get_relation_from_server "$issueid" "$relstring")
+			if [ "$relid" ] ; then
+				echo "delete_relation $relid"
+				delete_relation "$relid" || exit 1
+			fi
+		done
+	fi
+
+	# echo "[$tracker, $status, $newrel, $oldrel, $subject]"
+	cat <<EOF > $TMPDIR/update.json
+{ "issue": {
+  "status_id": $(status_to_id $status),
+  "tracker_id": $(tracker_to_id $tracker),
+  "subject": "${subject//\"/\\\"}"
+}}
+EOF
+	# cat $TMPDIR/update.json
+	__upload_ticket $TMPDIR/update.json $issueid || return 1
+	if [ -s "$TMPDIR/upload_relations.json" ] ; then
+		echo "update relations"
+	fi
+}
+
+get_list_of_changed_tickets() {
+	local file="$1"
+
+	grep "^[+-] " "$file" | awk '{print $2}' | sort | uniq
+}
+
+# DONE
+# - 既存の issue の状態、トラッカー、関連、サブジェクトの更新
+#
+# TODO
+# - 新しい issue の追加
+# - issue の削除
+# - issue の更新
+#   - 親子関係は、直接変更しなかった issue も影響を受けることがあり、複雑である。
+#   - 事前に parent tree map を保持しておいて、draft 編集後にどのように構造が変わったかチェックする。
+#   - project の変更、これも親プロジェクトの変更とリンクする話
+edit_tree() {
+	local draft="$1"
+	local newline=
+	local oldline=
+
+	cp $TMPDIR/out $TMPDIR/out.copy
+	$EDITOR $draft
+	diff -u $TMPDIR/out.copy $TMPDIR/out > $TMPDIR/out.diff
+
+	local changed_ids="$(get_list_of_changed_tickets $TMPDIR/out.diff)"
+	for id in $changed_ids ; do
+		newline="$(grep "^+ *$id " $TMPDIR/out.diff)"
+		oldline="$(grep "^- *$id " $TMPDIR/out.diff)"
+		if [ "$newline" ] && [ "$oldline" ] ; then
+			echo update_ticket $id
+			parse_new_line "$id" "$newline" "$oldline"
+		elif [ "$newline" ] ; then
+			echo create_ticket $id
+		elif [ "$oldline" ] ; then
+			echo remove_ticket $id
+		fi
+	done
+
+	# if no error
+	update_local_cache
+}
+
 get_project_table $RM_CONFIG/projects.json
-# echo ${SUBPJ_TABLE[*]}
-# cat $TMPDIR/top_level_projects
 
 if [ "$PROJECT" == all ] ; then
 	PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
@@ -242,4 +287,8 @@ for pjid in $PROJECT ; do
 	show_project_tree $pjid >> $TMPDIR/out
 done
 
-cat $TMPDIR/out | expand
+if [ "$EDIT" ] ; then
+	edit_tree $TMPDIR/out
+else
+	cat $TMPDIR/out | expand
+fi

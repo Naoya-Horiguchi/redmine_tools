@@ -22,8 +22,12 @@ json_add_int() {
 }
 
 __update_ticket() {
-	local file=$1
-	local issueid=$2
+	local file="$1"
+	local issueid="$2"
+	local outjson="$3"
+
+	[ ! "$outjson" ] && outjson=$TMPD/$issue/upload.json
+
 	local subject="$(grep -i ^#\+subject: $file | sed 's|^#+subject: *||i')"
 	local issue="$(grep -i ^#\+issue: $file | sed 's|^#+issue: *||i')"
 	[ ! "$issue" ] && issue=$issueid
@@ -60,79 +64,89 @@ __update_ticket() {
 	fi
 	[ ! "$version_id" ] && version_id=$version
 	# blocks, follows など、関連に関わる要素
-	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPD/$issue/body
-	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPD/$issue/note
+	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPDIR/body
+	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPDIR/note
 
     # is_private
     # category_id
     # watcher_user_ids
-	echo "{\"issue\": {}}" > $TMPD/$issue/upload.json
+	echo "{\"issue\": {}}" > $outjson
 	if [ "$subject" ] ; then
-		json_add_text $TMPD/$issue/upload.json .issue.subject "$subject" || return 1
+		json_add_text $outjson .issue.subject "$subject" || return 1
 	fi
-	if [ "$issue" != new ] && [ "$issue" -gt 0 ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.id $issue || return 1
-	fi
+	# if [ "$issue" ] && [ "$issue" != new ] && [ "$issue" -gt 0 ] ; then
+	# 	json_add_int $outjson .issue.id $issue || return 1
+	# fi
 	if [ "$project_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.project_id $project_id || return 1
+		json_add_int $outjson .issue.project_id $project_id || return 1
 	fi
 	if [ "$tracker_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.tracker_id $tracker_id || return 1
+		json_add_int $outjson .issue.tracker_id $tracker_id || return 1
 	fi
 	if [ "$status_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.status_id $status_id || return 1
+		json_add_int $outjson .issue.status_id $status_id || return 1
 	fi
 	if [ "$priority_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.priority_id $priority_id || return 1
+		json_add_int $outjson .issue.priority_id $priority_id || return 1
 	fi
 	if [ "$parent_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.parent_issue_id $parent_id || return 1
+		json_add_int $outjson .issue.parent_issue_id $parent_id || return 1
 	fi
 	if [ "$assigned_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.assigned_to_id $assigned_id || return 1
+		json_add_int $outjson .issue.assigned_to_id $assigned_id || return 1
 	fi
 	if [ "$done_ratio" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.done_ratio $done_ratio || return 1
+		json_add_int $outjson .issue.done_ratio $done_ratio || return 1
 	fi
 	if [ "$estimate" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.estimated_hours $estimate || return 1
+		json_add_int $outjson .issue.estimated_hours $estimate || return 1
 	fi
-	if [ "$due_date" ] && [ "$due_date" != "null" ] ; then
+	if [ "$due_date" ] ; then # && [ "$due_date" != "null" ] ; then
 		local date_text="$(date -d "$due_date" +%Y-%m-%d)"
-		json_add_text $TMPD/$issue/upload.json .issue.due_date "$date_text" || return 1
+		json_add_text $outjson .issue.due_date "$date_text" || return 1
 	fi
 	# category
 	if [ "$version_id" ] ; then
-		json_add_int $TMPD/$issue/upload.json .issue.fixed_version_id $version_id || return 1
+		json_add_int $outjson .issue.fixed_version_id $version_id || return 1
 	fi
-	if [ -s "$TMPD/$issue/body" ] ; then
-		json_add_text $TMPD/$issue/upload.json .issue.description "$(cat $TMPD/$issue/body)" || return 1
+	# TODO: check '"' is escaped properly
+	if [ -e "$TMPDIR/body" ] ; then
+		json_add_text $outjson .issue.description "$(cat $TMPDIR//body)" || return 1
 	fi
-	if [ -s "$TMPD/$issue/note" ] ; then
-		json_add_text $TMPD/$issue/upload.json .issue.notes "$(cat $TMPD/$issue/note)" || return 1
+	if [ -s "$TMPDIR/note" ] ; then
+		json_add_text $outjson .issue.notes "$(cat $TMPDIR/note)" || return 1
 	fi
+}
+
+__create_ticket() {
+	local file=$1
+
+	curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X POST --data-binary "@${file}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
 }
 
 create_ticket() {
 	local file=$1
 	local issueid=$2
-	__update_ticket $file $issueid || return 1
-	if [ "$VERBOSE" ] ; then
-		echo "json to be uploaded"
-		cat $TMPD/$issueid/upload.json
-	fi
-	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X POST --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues.json
+	local outjson=$3
+	[ ! "$outjson" ] && outjson=$TMPD/$issueid/upload.json
+	__update_ticket "$file" "$issueid" "$outjson" || return 1
+	__create_ticket $outjson || return 1
+}
+
+__upload_ticket() {
+	local file=$1
+	local issueid=$2
+
+	curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X PUT --data-binary "@${file}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
 }
 
 upload_ticket() {
 	local file=$1
 	local issueid=$2
-	__update_ticket $file $issueid || return 1
-	if [ "$VERBOSE" ] ; then
-		echo "json to be uploaded"
-		cat $TMPD/$issueid/upload.json
-	fi
-	curl ${INSECURE:+-k} -H "Content-Type: application/json" -X PUT --data-binary "@$TMPD/$issueid/upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${issueid}.json
+	local outjson=$3
+	[ ! "$outjson" ] && outjson=$TMPD/$issueid/upload.json
+	__update_ticket $file $issueid $outjson || return 1
+	__upload_ticket $outjson $issueid
 }
 
 __curl_limit() {
@@ -167,6 +181,7 @@ __curl() {
 	local data="$3"
 
 	[ ! "$out" ] && echo "invalid input" && return 1
+	[ "$VERBOSE" ] && echo "curl ${INSECURE:+-k} -s -o $tmpf \"$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}\""
 	curl ${INSECURE:+-k} -s -o $tmpf "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" || return 1
 	if [ -s "$tmpf" ] ; then
 		mkdir -p $(dirname $out)
@@ -199,7 +214,7 @@ __format_to_draft() {
 	local relcsv="$3"
 
 	# cat $tmpjson
-	[ -s "$tmpfile" ] && rm $tmpfile
+	[ -s "$tmpfile" ] && echo -n "" > $tmpfile
 	echo "#+DoneRatio: $(jq -r .done_ratio $tmpjson)" >> $tmpfile
 	echo "#+Status: $(jq -r .status.name $tmpjson)" >> $tmpfile
 	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $tmpfile
@@ -249,288 +264,14 @@ __format_to_draft() {
 	fi
 }
 
-download_issue() {
-	local issueid=$1
-	local tmpjson=$TMPD/$issueid/issue.json
-	local tmpfile=$TMPD/$issueid/draft.md
-	local relcsv=$TMPD/$issueid/relations.csv
+update_relations2() {
+	local issueid="$1"
+	local draft="$2"
 
-	fetch_issue "$issueid" "$relcsv" "$tmpjson" || return 1
-	__format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || return 1
-	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $tmpfile
-	local projectid=$(jq -r .project.id $tmpjson)
-	rm -f $TMPD/$issueid/legends
-	generate_legends >> $TMPD/$issueid/legends
-	generate_version_legends $projectid >> $TMPD/$issueid/legends
-}
-
-generate_legends() {
-	echo "### NOTE ###"
-	echo "# projects"
-	jq -r ".projects[] | [.id, .name] | @csv" $RM_CONFIG/projects.json | sort -k1n
-	echo ""
-	echo "# trackers"
-	jq -r ".trackers[] | [.id, .name] | @csv" $RM_CONFIG/trackers.json | sort -k1n
-	echo ""
-	echo "# statuses"
-	jq -r ".issue_statuses[] | [.id, .name] | @csv" $RM_CONFIG/issue_statuses.json | sort -k1n
-	echo ""
-	echo "# priorities"
-	jq -r ".issue_priorities[] | [.id, .name] | @csv" $RM_CONFIG/priorities.json | sort -k1n
-}
-
-generate_version_legends() {
-	local project=$1
-
-	echo ""
-	echo "# versions for project $project:"
-	jq -r ".versions[] | [.id, .project.name, .name] | @csv" $RM_CONFIG/versions/$project.json | sort -k1n
-}
-
-generate_issue_template() {
-	local tmpfile=$TMPD/new/draft.md
-	local relcsv=$TMPD/new/relations.csv
-
-	mkdir -p $TMPD/new
-
-	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
-	rm $tmpfile
-	echo "#+Project: " >> $tmpfile
-	echo "#+Subject: subject" >> $tmpfile
-	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき
-	echo "#+Tracker: Epic" >> $tmpfile
-	echo "#+Status: New" >> $tmpfile
-	echo "#+Priority: Normal" >> $tmpfile
-	echo "#+ParentIssue: null" >> $tmpfile
-	if [ "$RM_USERLIST" ] ; then
-		echo "#+Assigned: null" >> $tmpfile
-	fi
-	echo "#+DoneRatio: 0" >> $tmpfile
-	echo "#+Estimate: 1" >> $tmpfile
-	echo "#+DueDate: null" >> $tmpfile
-	# echo "#+Category: null" >> $tmpfile
-	echo "#+Version: null" >> $tmpfile
-	echo "#+Format: $RM_FORMAT" >> $tmpfile
-	# TODO: 他の関連
-	echo "#+Blocks: " >> $tmpfile
-	echo "#+Precedes: " >> $tmpfile
-	echo "#+Follows: " >> $tmpfile
-	echo "#+Relates: " >> $tmpfile
-	echo "" >> $tmpfile
-	rm -f $TMPD/new/legends
-	generate_legends >> $TMPD/new/legends
-}
-
-keep_original_draft() {
-	local issueid=$1
-
-	cp $TMPD/$issueid/draft.md $TMPD/$issueid/tmp.draft.md
-}
-
-ask_done_ratio_update() {
-	local done_ratio="$(grep -i ^#\+doneratio: $TMPD/$issueid/tmp.draft.md | sed 's|^#+doneratio: *||i')"
-
-	diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
-	if [ -s $TMPD/$issueid/edit.diff ] && ! grep -q -i "^+#+doneratio:" $TMPD/$issueid/edit.diff ; then
-		[ "$done_ratio" -eq 100 ] && return
-		echo -n "Update DoneRatio? ($done_ratio): "
-		read input
-		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
-			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $TMPD/$issueid/draft.md
-		fi
-
-		# TODO: Status change caused by done_ratio update
-	fi
-}
-
-edit_issue() {
-	local issueid=$1
-
-	while true ; do
-		if [ "$RM_LEGEND" ] ; then
-			$EDITOR $TMPD/$issueid/legends $TMPD/$issueid/draft.md
-		else
-			$EDITOR $TMPD/$issueid/draft.md
-		fi
-		ask_done_ratio_update
-		diff -u $TMPD/$issueid/tmp.draft.md $TMPD/$issueid/draft.md > $TMPD/$issueid/edit.diff
-		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "$TMPD/$issueid/edit.diff" ] ; then
-			echo "no diff, so no need to upload"
-			return 1
-		fi
-		cat $TMPD/$issueid/edit.diff
-		[[ "$issueid" =~ ^L ]] && return 0
-		[ "$LOCALTICKET" ] && return 0 # new local ticket
-		echo
-		echo "Your really upload this change? (y: yes, n: no, e: edit again)"
-		read input
-		if [ "$input" == y ] || [ "$input" == Y ] ; then
-			return 0
-		elif [ "$input" == n ] || [ "$input" == N ] ; then
-			return 1
-		else
-			true # edit again
-		fi
+	generate_relation_json_from_draft $issueid $draft | while read line ; do
+		echo "$line" > $TMPDIR/relation.json
+		create_relation $issueid $TMPDIR/relation.json || exit 1
 	done
-}
-
-update_relations() {
-	local issueid=$1
-	local new=$2  # might be empty string
-	local dir=$TMPD/$issueid
-	[ "$new" ] && dir="$TMPD/$new"
-	local relcsv=$dir/relations.csv
-	touch $relcsv
-
-	grep -i "^+#+blocks:" $dir/edit.diff | while read line ; do
-		local newblocks="$(grep -i ^+#+blocks: $dir/edit.diff | sed 's|^+#+blocks: *||i')"
-
-		if [ "$newblocks" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newblocks, \"relation_type\": \"blocks\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
-		fi
-	done
-
-	grep -i "^+#+precedes:" $dir/edit.diff | while read line ; do
-		local newprecedes="$(grep -i ^+#+precedes: $dir/edit.diff | sed 's|^+#+precedes: *||i')"
-
-		if [ "$newprecedes" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newprecedes, \"relation_type\": \"precedes\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
-		fi
-	done
-
-	grep -i "^+#+follows:" $dir/edit.diff | while read line ; do
-		local newfollows="$(grep -i ^+#+follows: $dir/edit.diff | sed 's|^+#+follows: *||i')"
-
-		if [ "$newfollows" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newfollows, \"relation_type\": \"follows\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
-		fi
-	done
-
-	grep -i "^+#+relates:" $dir/edit.diff | while read line ; do
-		local newrelates="$(grep -i ^+#+relates: $dir/edit.diff | sed 's|^+#+relates: *||i')"
-
-		if [ "$newrelates" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newrelates, \"relation_type\": \"relates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
-		fi
-	done
-
-	grep -i "^+#+duplicates:" $dir/edit.diff | while read line ; do
-		local newduplicates="$(grep -i ^+#+duplicates: $dir/edit.diff | sed 's|^+#+duplicates: *||i')"
-
-		if [ "$newduplicates" ] ; then
-			curl ${INSECURE:+-k} -s -X POST -H "Content-Type: application/json" --data-binary "{\"relation\": {\"issue_to_id\": $newduplicates, \"relation_type\": \"duplicates\"}}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/$issueid/relations.json
-		fi
-	done
-
-	grep -i "^-#+blocks:" $dir/edit.diff | while read line ; do
-		local oldblocks="$(grep -i ^-#+blocks: $dir/edit.diff | sed 's|^-#+blocks: *||i')"
-		local relid=$(grep $issueid,blocks,$oldblocks $relcsv | cut -f4 -d,)
-
-		if [ "$relid" ] ; then
-			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
-		fi
-	done
-
-	grep -i "^-#+precedes:" $dir/edit.diff | while read line ; do
-		local oldprecedes="$(grep -i ^-#+precedes: $dir/edit.diff | sed 's|^-#+precedes: *||i')"
-		local relid=$(grep $oldprecedes,precedes,$issueid $relcsv | cut -f4 -d,)
-
-		if [ "$relid" ] ; then
-			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
-		fi
-	done
-
-	grep -i "^-#+relates:" $dir/edit.diff | while read line ; do
-		# TODO: 横展開の必要あり
-		relid=
-		local oldrelates="$(grep -i ^-#+relates: $dir/edit.diff | sed 's|^-#+relates: *||i')"
-		if [ ! "$oldrelates" ] ; then
-			true
-		elif [ "$oldrelates" -gt "$issueid" ] ; then
-			local relid=$(grep $issueid,relates,$oldrelates $relcsv | cut -f4 -d,)
-		else
-			local relid=$(grep $oldrelates,relates,$issueid $relcsv | cut -f4 -d,)
-		fi
-
-		if [ "$relid" ] ; then
-			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
-		fi
-	done
-
-	grep -i "^-#+duplicates:" $dir/edit.diff | while read line ; do
-		relid=
-		local oldduplicates="$(grep -i ^-#+duplicates: $dir/edit.diff | sed 's|^-#+duplicates: *||i')"
-		if [ ! "$oldduplicates" ] ; then
-			true
-		elif [ "$oldduplicates" -gt "$issueid" ] ; then
-			local relid=$(grep $issueid,duplicates,$oldduplicates $relcsv | cut -f4 -d,)
-		else
-			local relid=$(grep $oldduplicates,duplicates,$issueid $relcsv | cut -f4 -d,)
-		fi
-
-		if [ "$relid" ] ; then
-			curl ${INSECURE:+-k} -s -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/relations/${relid}.json
-		fi
-	done
-}
-
-upload_issue() {
-	local issueid=$1
-	local tmpfile=$TMPD/$issueid/draft.md
-
-	[ "$VERBOSE" ] && echo "upload_ticket"
-	upload_ticket $tmpfile $issueid || return 1
-	[ "$VERBOSE" ] && echo "update_relations $issueid"
-	update_relations $issueid || return 1
-}
-
-create_issue() {
-	# issueid is defined in caller update_issue()
-	local tmpfile=$TMPD/$issueid/draft.md
-
-	mkdir -p $TMPD/$issueid
-	[ "$VERBOSE" ] && echo "create_ticket"
-	create_ticket $tmpfile $issueid > $TMPD/$issueid/tmp.issue.json
-	cat $TMPD/$issueid/tmp.issue.json
-
-	[[ "$issueid" =~ ^L ]] && return 0
-	issueid=$(jq -r ".issue.id" $TMPD/$issueid/tmp.issue.json)
-	[ "$issueid" == null ] && echo "failed to get new ticket ID" && return 1
-	mv $TMPD/new/ $TMPD/$issueid/
-	[ "$VERBOSE" ] && echo update_relations $issueid
-	# TODO: いったん disable する。relation は一回チケットを作成してから edit で実行することにする。
-	# update_relations "$issueid" new || return 1
-	return 0
-	# TODO: 複数 issue の作成がコンフリクトしうる、そもそもローカルキャッシュなので
-	# new をリネームする必要は薄いと思われる。
-}
-
-prepare_draft_file() {
-	local issueid=$1
-
-	if [ "$LOCALTICKET" ] ; then
-		if [ ! -s "$TMPD/$issueid/draft.md" ] ; then
-			generate_issue_template || return 1
-			mv $TMPD/new/* $TMPD/$issueid/
-		fi
-	elif [ "$issueid" == new ] ; then
-		if [ ! "$NO_DOWNLOAD" ] ; then
-			generate_issue_template || return 1
-		fi
-	elif [[ "$issueid" =~ ^L ]] ; then
-		if [ ! -d "$TMPD/$issueid" ] ; then
-			echo "local ticket $issueid not found"
-			return 1
-		fi
-	else
-		if [ ! "$NO_DOWNLOAD" ] ; then
-			echo "Downloading ..."
-			download_issue $issueid || return 1
-		fi
-	fi
-	# TODO: ローカルチケットや new の場合は避けたいところ
-	__curl "/issues.json" $TMPD/$issueid/tmp.before_edit "issue_id=$issueid"
-	keep_original_draft $issueid
 }
 
 __check_opened() {
@@ -556,56 +297,14 @@ __check_opened() {
 
 __open_clock() {
 	local issueid=$1
+	mkdir -p $TMPD/$issueid
 	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
 }
 
 __close_clock() {
 	local issueid=$1
+	trap 2
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
-}
-
-update_issue() {
-	local issueid=$1
-
-	__check_opened $issueid || return 1
-
-	__open_clock $issueid
-	trap "__close_clock $issueid" 2
-	while true ; do
-		edit_issue $issueid || break
-		[[ "$issueid" =~ ^L ]] && break
-		__curl "/issues.json" $TMPD/$issueid/tmp.after_edit "issue_id=$issueid"
-
-		if [ "$issueid" == new ] ; then
-			# issueid will be update from "new" to generated ID
-			create_issue $issueid && break
-			echo "create_issue failed, check draft.md and/or network connection."
-			echo "type any key to open editor again."
-			read input
-		elif cmp --silent $TMPD/$issueid/tmp.before_edit $TMPD/$issueid/tmp.after_edit ; then
-			upload_issue $issueid && break
-			echo "update_issue failed, check draft.md and/or network connection."
-			echo "type any key to open editor again."
-			read input
-		else
-			get_conflict $issueid > $TMPD/$issueid/tmp.draft.conflict
-			if [ -s "$TMPD/$issueid/tmp.draft.conflict" ] ; then
-				# TODO: assuming markdown now, need to support textile format?
-				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $TMPD/$issueid/draft.md
-				echo "~~~" >> $TMPD/$issueid/draft.md
-				cat $TMPD/$issueid/tmp.draft.conflict >> $TMPD/$issueid/draft.md
-				echo "~~~" >> $TMPD/$issueid/draft.md
-				echo "Conflict is detected, please resolve it manually."
-				echo "type any key to reopen editor again."
-				read input
-				__curl "/issues.json" $TMPD/$issueid/tmp.before_edit "issue_id=$issueid"
-			else
-				# 誰かが全く同一の更新を行ったことを意味するので、そのまま抜けてしまって構わない。
-				break
-			fi
-		fi
-	done
-	__close_clock $issueid
 }
 
 declare -A PJTABLE;
@@ -622,12 +321,6 @@ generate_project_table() {
 		pjtable["$id"]="$pjname"
 	done
 	IFS="$ifs"
-}
-
-project_name() {
-	local projectid=$1
-
-	jq -r ".projects[] | select(.id == $projectid) | .name" $RM_CONFIG/projects.json
 }
 
 open_with_browser() {
@@ -672,18 +365,6 @@ get_local_ticket_list() {
 	ls -1 $RM_CONFIG/edit_memo | grep ^L
 }
 
-get_conflict() {
-	local issueid=$1
-	local tmpjson=$TMPD/$issueid/issue.json
-	local draftfile=$TMPD/$issueid/draft.md
-
-	fetch_issue "$issueid" "" "$tmpjson" || return 1
-	__format_to_draft "$tmpjson" /tmp/sdf.tmp "" || return 1
-	awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' $draftfile > /tmp/draft.md
-
-	diff -u /tmp/draft.md /tmp/sdf.tmp
-}
-
 RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
 
 update_local_cache() {
@@ -705,6 +386,386 @@ update_local_cache() {
 	fi
 	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 }
+
+# WIP
++# TODO: ticket remove
++# TODO: relations are not updated automatically
++# TODO: download server data in background
++# TODO: update locking
+update_local_cache_task() {
+	local id="$1"
+
+	__curl "/issues.json" $TMPDIR/tmp.update_local_cache_task "&issue_id=$id&include=relations&status_id=*"
+	jq -r ".issues[]" $TMPDIR/tmp.update_local_cache_task > $TMPDIR/tmp.update_local_cache_task_new
+	jq -r --slurpfile new_items $TMPDIR/tmp.update_local_cache_task_new \
+	   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json || return 1
+	mv $TMPDIR/tmp.issues.json $RM_CONFIG/issues.json
+}
+
+declare -A SUBTASK_TABLE
+declare -A TRACKER_TABLE
+declare -A STATUS_TABLE
+declare -A SUBJECT_TABLE
+get_subtask_table() {
+	local data=$1
+
+	echo -n "" > $TMPDIR/top_level_tasks
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ". | [.project.id, .id, .parent.id, .tracker.name, .status.name, .subject] | @tsv" $data | sort -k2n) ; do
+		local taskid=$(echo $line | cut -f2)
+		local parentid=$(echo $line | cut -f3)
+		if [ "$parentid" ] ; then
+			SUBTASK_TABLE[$parentid]="${SUBTASK_TABLE[$parentid]} $taskid"
+		else
+			echo $taskid >> $TMPDIR/top_level_tasks
+		fi
+		TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
+		STATUS_TABLE[$taskid]="$(echo $line | cut -f5)"
+		SUBJECT_TABLE[$taskid]="$(echo $line | cut -f6)"
+	done
+	IFS="$ifs"
+}
+
+get_metadata_table() {
+	local data="$1"
+
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".issues[] | [.id, .tracker.name, .status.name, .subject] | @tsv" $data | sort -k1n) ; do
+		local taskid="$(echo $line | cut -f1)"
+		TRACKER_TABLE[$taskid]="$(echo $line | cut -f2)"
+		STATUS_TABLE[$taskid]="$(echo $line | cut -f3)"
+		SUBJECT_TABLE[$taskid]="$(echo $line | cut -f4)"
+	done
+	IFS="$ifs"
+}
+
+declare -A RELATION_TABLE
+get_relation_table() {
+	local data=$1
+
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".relations[] | [.id, .issue_id, .issue_to_id, .relation_type] | @tsv" $data | sort -k1n | uniq) ; do
+		local issueid=$(echo $line | cut -f2)
+		local issuetoid=$(echo $line | cut -f3)
+		local reltype=$(echo $line | cut -f4)
+		local relstr="$(get_relation_string $issuetoid $reltype)"
+
+		if [ "${RELATION_TABLE[$issueid]}" ] ; then
+			RELATION_TABLE[$issueid]="${RELATION_TABLE[$issueid]},$relstr"
+		else
+			RELATION_TABLE[$issueid]="$relstr"
+		fi
+	done
+	IFS="$ifs"
+}
+
+tracker_colored() {
+	local stat
+	printf "${CL_GREEN}${TRACKER_TABLE[$taskid]}${CL_NC}"
+}
+
+get_tracker_part() {
+	local taskid=$1
+
+	if [ "${STATUS_TABLE[$taskid]}" ] ; then
+		printf "${CL_GREEN}${TRACKER_TABLE[$taskid]}${CL_NC}"
+	else
+		echo "-"
+	fi
+}
+
+get_status_part() {
+	local taskid=$1
+
+	if [ "${STATUS_TABLE[$taskid]}" ] ; then
+		if status_closed "${STATUS_TABLE[$taskid]}" ; then
+			printf "${CL_DGRAY}${STATUS_TABLE[$taskid]}${CL_NC}"
+		else
+			printf "${CL_YELLOW}${STATUS_TABLE[$taskid]}${CL_NC}"
+		fi
+	else
+		echo "-"
+	fi
+}
+
+get_relation_part() {
+	local taskid=$1
+
+	if [ "${RELATION_TABLE[$taskid]}" ] ; then
+		printf "(${CL_RED}${RELATION_TABLE[$taskid]}${CL_NC}) "
+	fi
+}
+
+get_meta_part() {
+	# printf "<${CL_GREEN}${TRACKER_TABLE[$taskid]}|${STATUS_TABLE[$taskid]}${CL_NC}> "
+	printf "<$(get_tracker_part "$1")|$(get_status_part "$1")> "
+}
+
+edit_local_ticket() {
+	local issueid="$1"
+	local draft=$TMPD/$issueid/$RM_DRAFT_FILENAME
+
+	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
+	trap "date --iso-8601=seconds >> $TMPDIR/$issueid/.clock.log ; exit 0" 2
+	$EDITOR $draft
+	trap 2
+	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+}
+
+download_target_issue() {
+	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations"
+}
+
+convert_to_draft_from_json() {
+	local issueid="$1"
+	local jsonfile="$2"
+	local tmpjson=$TMPDIR/tmp.json
+	local draft="$3"
+
+	# jq -r ".issues[] | select(.id == $issueid)" $RM_CONFIG/issues.json > $tmpjson
+	jq -r ".issues[] | select(.id == $issueid)" $jsonfile > $tmpjson
+
+	[ -s "$draft" ] && echo -n "" > $draft
+	echo "#+DoneRatio: "$(jq -r .done_ratio $tmpjson) >> $draft
+	echo "#+Status: $(jq -r '.status.name' $tmpjson)" >> $draft
+	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $draft
+	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $draft
+	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $draft
+	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $draft
+	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $draft
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $draft
+	fi
+	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $draft
+	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $draft
+	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $draft
+	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $draft
+	echo "#+Format: $RM_FORMAT" >> $draft
+
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".issues[] | select(.id == $issueid) | .relations[] | [.relation_type, .issue_to_id] | @tsv" $RM_CONFIG/issues.json) ; do
+		local reltype=$(echo $line | cut -f1)
+		# TODO: upper case first character
+		# foo="$(tr '[:lower:]' '[:upper:]' <<< ${reltype:0:1})${reltype:1}"
+		local issuetoid=$(echo $line | cut -f2)
+		echo "#+${reltype}: ${issuetoid}" >> $draft
+	done
+	IFS="$ifs"
+
+	if [ "$(jq -r .description $tmpjson)" != null ] ; then
+		jq -r .description $tmpjson | sed "s/\r//g" >> $draft
+	fi
+}
+
+ask_done_ratio_update3() {
+	local done_ratio="$(grep -i ^#\+doneratio: ${draft}.before_edit | sed 's|^#+doneratio: *||i')"
+
+	diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
+	if [ -s ${draft}.edit.diff ] && ! grep -q -i "^+#+doneratio:" ${draft}.edit.diff ; then
+		[ "$done_ratio" -eq 100 ] && return
+		echo -n "Update DoneRatio? ($done_ratio): "
+		read input
+		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
+			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $draft
+		fi
+
+		# TODO: Status change caused by done_ratio update
+	fi
+}
+
+edit_issue3() {
+	local issueid="$1"
+	local draft="$2"
+
+	while true ; do
+		$EDITOR $draft
+		ask_done_ratio_update3
+		diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
+		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "${draft}.edit.diff" ] ; then
+			echo "no diff, so no need to upload"
+			return 1
+		fi
+		[[ "$issueid" =~ ^L ]] && return 0
+		cat ${draft}.edit.diff
+		echo
+		echo "You really upload this change? (y: yes, n: no, e: edit again)"
+		read input
+		if [ "$input" == y ] || [ "$input" == Y ] ; then
+			return 0
+		elif [ "$input" == n ] || [ "$input" == N ] ; then
+			return 1 # abort
+		else
+			true # edit again
+		fi
+	done
+}
+
+update_relations3() {
+	local issueid="$1"
+	local draftdiff="$2"
+
+	grep -e "^-#+" $draftdiff | cut -c2- > $TMPDIR/tmp.draft.diff.removed
+	grep -e "^+#+" $draftdiff | cut -c2- > $TMPDIR/tmp.draft.diff.added
+
+	grep -i -e "^#+relates:" -e "^#+precedes:" -e "^#+blocks:" -e "^#+duplicates:" -e "^#+copied_to:" $TMPDIR/tmp.draft.diff.removed | awk '{print $2}' > $TMPDIR/tmp.draft.diff.remove_id
+	for toid in $(cat $TMPDIR/tmp.draft.diff.remove_id) ; do
+		echo get_relation_id $issueid A$toid
+		local relid=$(get_relation_id $issueid A$toid)
+		if [ "$relid" ] ; then
+			delete_relation $relid
+		fi
+	done
+
+	generate_relation_json_from_draft $issueid $TMPDIR/tmp.draft.diff.added | while read line ; do
+		echo "$line" > $TMPDIR/relation.json
+		create_relation $issueid $TMPDIR/relation.json || exit 1
+	done
+}
+
+update_issue3() {
+	local issueid="$1"
+	local draft=$TMPDIR/$RM_DRAFT_FILENAME
+
+	__check_opened $issueid || return 1
+
+	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
+	convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
+	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
+	cp $draft ${draft}.before_edit
+
+	__open_clock $issueid
+	trap "__close_clock $issueid ; exit 0" 2
+	while true ; do
+		# symlinks for easy access
+		ln -s $TMPD/$issueid/.clock.log $TMPDIR/clock
+		ln -s $TMPD/$issueid $TMPDIR/cache
+		edit_issue3 $issueid $draft || break
+		[[ "$issueid" =~ ^L ]] && break
+		__curl "/issues.json" $TMPDIR/tmp.after_edit "&issue_id=$issueid&include=relations&status_id=*"
+		if cmp --silent $TMPDIR/tmp.before_edit $TMPDIR/tmp.after_edit ; then
+			upload_ticket $draft $issueid $TMPDIR/tmp.upload.json
+			if [ $? -eq 0 ] ; then
+				update_relations3 $issueid ${draft}.edit.diff
+				# TODO: need to download forcibly when you update relationship
+				# because timestamp might not be updated.
+				( update_local_cache_task $ISSUEID ) &
+				break
+			fi
+			echo "update_issue failed, check draft.md and/or network connection."
+			echo "type any key to open editor again."
+			read input
+		else
+			convert_to_draft_from_json $issueid $TMPDIR/tmp.after_edit ${draft}.after_edit
+			awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' ${draft}.before_edit > ${draft}.before_edit2
+			diff -u ${draft}.before_edit2 ${draft}.after_edit > $TMPDIR/tmp.draft.conflict
+			if [ -s "$TMPDIR/tmp.draft.conflict" ] ; then
+				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $draft
+				echo "~~~" >> $draft
+				cat $TMPDIR/tmp.draft.conflict >> $draft
+				echo "~~~" >> $draft
+				echo "Conflict is detected, please resolve it manually."
+				echo "type any key to reopen editor again."
+				read input
+				__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
+			else
+				# 誰かが全く同一の更新を行ったことを意味するので、そのまま抜けてしまって構わない。
+				break
+			fi
+		fi
+	done
+	__close_clock $issueid
+}
+
+generate_issue_template2() {
+	local tmpfile=$TMPDIR/new/$RM_DRAFT_FILENAME
+	mkdir -p $(dirname $tmpfile)
+
+	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
+	echo -n "" > $tmpfile
+	echo "#+Project: " >> $tmpfile
+	echo "#+Subject: subject" >> $tmpfile
+	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
+	echo "#+Tracker: Epic" >> $tmpfile
+	echo "#+Status: New" >> $tmpfile
+	echo "#+Priority: Normal" >> $tmpfile
+	echo "#+ParentIssue: null" >> $tmpfile
+	if [ "$RM_USERLIST" ] ; then
+		echo "#+Assigned: null" >> $tmpfile
+	fi
+	echo "#+DoneRatio: 0" >> $tmpfile
+	echo "#+Estimate: 1" >> $tmpfile
+	echo "#+DueDate: null" >> $tmpfile
+	# echo "#+Category: null" >> $tmpfile
+	echo "#+Version: null" >> $tmpfile
+	echo "#+Blocks: " >> $tmpfile
+	echo "#+Precedes: " >> $tmpfile
+	echo "#+Follows: " >> $tmpfile
+	echo "#+Relates: " >> $tmpfile
+	echo "" >> $tmpfile
+
+	cat $tmpfile
+	echo $TMPDIR
+}
+
+create_issue2() {
+	local tmpfile="$1"
+
+	create_ticket $tmpfile "" $TMPDIR/new/create.json > $TMPDIR/new/create.result.json
+	local newissueid=$(jq -r ".issue.id" $TMPDIR/new/create.result.json)
+	[ "$newissueid" == null ] && echo "failed to get new ticket ID" && return 1
+
+	# issueid is defined in caller update_issue()
+	issueid=$newissueid
+
+	update_relations2 "$issueid" "$draft" || return 1
+}
+
+update_new_issue() {
+	local draft=$TMPDIR/new/$RM_DRAFT_FILENAME
+
+	echo -n "$(date --iso-8601=seconds) " >> $TMPDIR/new/.clock.log
+	trap "__close_clock $issueid ; exit 0" 2
+	while true ; do
+		$EDITOR $draft
+		[ "$NEWLOCALTID" ] && break # new local ticket
+		echo
+		echo "You really upload this change? (y: yes, n: no, e: edit again)"
+		read input
+		if [ "$input" == y ] || [ "$input" == Y ] ; then
+			create_issue2 $draft
+			break
+		elif [ "$input" == n ] || [ "$input" == N ] ; then
+			echo temporary files are stored on $TMPDIR
+			break
+		else
+			true # edit again
+		fi
+	done
+	trap 2
+	echo "$(date --iso-8601=seconds)" >> $TMPDIR/new/.clock.log
+
+	if [ "$issueid" ] ; then
+		# clock_copy
+		echo "new ticket: $issueid"
+		mkdir -p $TMPD/$issueid
+		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
+	elif [ "$NEWLOCALTID" ] ; then
+		# clock_copy
+		echo "new ticket: $NEWLOCALTID"
+		mkdir -p $TMPD/$NEWLOCALTID/
+		rsync -a $TMPDIR/new/ $TMPD/$NEWLOCALTID/
+	fi
+}
+
+if [ "$RM_FORMAT" = markdown ] ; then
+	RM_DRAFT_FILENAME="draft.md"
+else
+	RM_DRAFT_FILENAME="draft.textile"
+fi
 
 if [ ! "$RM_BASEURL" ] ; then
 	echo you need setup RM_BASEURL/RM_KEY
