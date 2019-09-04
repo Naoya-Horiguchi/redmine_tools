@@ -388,10 +388,10 @@ update_local_cache() {
 }
 
 # WIP
-+# TODO: ticket remove
-+# TODO: relations are not updated automatically
-+# TODO: download server data in background
-+# TODO: update locking
+# TODO: ticket remove
+# TODO: relations are not updated automatically
+# TODO: download server data in background
+# TODO: update locking
 update_local_cache_task() {
 	local id="$1"
 
@@ -567,7 +567,7 @@ ask_done_ratio_update3() {
 	diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
 	if [ -s ${draft}.edit.diff ] && ! grep -q -i "^+#+doneratio:" ${draft}.edit.diff ; then
 		[ "$done_ratio" -eq 100 ] && return
-		echo -n "Update DoneRatio? ($done_ratio): "
+		echo -n "Update DoneRatio from $done_ratio? (0-100 or Enter): "
 		read input
 		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
 			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $draft
