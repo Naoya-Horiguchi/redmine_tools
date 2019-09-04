@@ -32,11 +32,13 @@ for line in $(cat $TARGETFILE) ; do
 			if [ "$prevpj" ] ; then
 				NEW_PARENT_PJ_TABLE[$pj]=${PJARRAY[-1]}
 			fi
-		elif [ "$depth" -eq "$prevpjdepth" ] ; then
-			NEW_PARENT_PJ_TABLE[$pj]=${PJARRAY[-1]}
-		elif [ "$depth" -lt "$prevpjdepth" ] ; then
-			PJARRAY=( ${PJARRAY[@]::$[depth]} )
-			if [ "$depth" -gt 1 ] ; then
+		elif [ "$depth" -eq "$prevpjdepth" ] ; then # same level
+			if [ "$depth" -gt 0 ] ; then
+				NEW_PARENT_PJ_TABLE[$pj]=${PJARRAY[-1]}
+			fi
+		elif [ "$depth" -lt "$prevpjdepth" ] ; then # shallower
+			PJARRAY=( ${PJARRAY[@]::${depth}} )
+			if [ "$depth" -gt 0 ] ; then
 				NEW_PARENT_PJ_TABLE[$pj]=${PJARRAY[-1]}
 			fi
 		fi
