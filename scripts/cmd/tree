@@ -158,6 +158,29 @@ diff_check() {
 	grep -e "^+ *$"
 }
 
+find_new_parent() {
+	local issueid="$1"
+
+	local parent=$(grep "^+$issueid parenttask" $TMPDIR/pjtree.diff | cut -f3 -d' ')
+	[ "$parent" ] && echo $parent && return
+	parent=$(grep "^-$issueid parenttask" $TMPDIR/pjtree.diff | cut -f3 -d' ')
+	[ "$parent" ] && echo null && return
+	# unchange
+}
+
+find_new_project() {
+	local issueid="$1"
+
+	local project=$(grep "^+$issueid newpj" $TMPDIR/pjtree.diff | cut -f3 -d' ')
+	[ "$parent" ] && echo $parent && return
+	# unchange
+}
+
+# TODO: support project update
+find_new_parent_project() {
+	true
+}
+
 parse_new_line() {
 	local issueid=$1
 	local newline="$2"
@@ -227,11 +250,26 @@ parse_new_line() {
   "subject": "${subject//\"/\\\"}"
 }}
 EOF
+
+	local newparent="$(find_new_parent $issueid)"
+	if [ "$newparent" ] ; then
+		jq ".issue.parent_issue_id += \"$newparent\"" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
+
+	local newproject="$(find_new_project $issueid)"
+	if [ "$newproject" ] ; then
+		jq ".issue.project_id += ${newproject##PJ}" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
+
 	# cat $TMPDIR/update.json
 	__upload_ticket $TMPDIR/update.json $issueid || return 1
 	if [ -s "$TMPDIR/upload_relations.json" ] ; then
 		echo "update relations"
 	fi
+
+	( update_local_cache_task $issueid ) &
 }
 
 get_list_of_changed_tickets() {
@@ -258,6 +296,10 @@ edit_tree() {
 	cp $TMPDIR/out $TMPDIR/out.copy
 	$EDITOR $draft
 	diff -u $TMPDIR/out.copy $TMPDIR/out > $TMPDIR/out.diff
+	bash $THISDIR/project_tree_parse.sh $TMPDIR/out.copy | sort -k1n > $TMPDIR/pjtree.before || exit 1
+	bash $THISDIR/project_tree_parse.sh $TMPDIR/out | sort -k1n > $TMPDIR/pjtree.after || exit 1
+	diff -u0 $TMPDIR/pjtree.before $TMPDIR/pjtree.after > $TMPDIR/pjtree.diff
+	cat $TMPDIR/pjtree.diff
 
 	local changed_ids="$(get_list_of_changed_tickets $TMPDIR/out.diff)"
 	for id in $changed_ids ; do
