@@ -1,17 +1,20 @@
 #!/bin/bash
 #
 # Usage
-#   redmine tree [options]
+#   redmine tree [options] [pj ...]
 #
 # Description
+#   Print project tree to standard output. If you give project IDs as parameters,
+#   project trees under specified projects are printed. If you give no parameter,
+#   trees from all projects are printed.
 #
 # Options
-#   -p            specify project
+#   -e            edit project tree
+#   -o            exclude closed tickets
 #   -h            show this message
 #
 # TODO:
 #  - project summary tree (# of tasks for each status, tracker)
-#  - switch to hide "closed" tickets
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
@@ -28,10 +31,6 @@ while [[ $# -gt 0 ]] ; do
 			show_help
 			exit 0
 			;;
-		-p)
-			PROJECT="$2"
-			shift 2
-			;;
 		-e)
 			EDIT=true
 			shift 1
@@ -41,6 +40,7 @@ while [[ $# -gt 0 ]] ; do
 			shift 1
 			;;
 		*)
+			break
 			# echo "invalid option $key"
 			;;
 	esac
@@ -48,6 +48,7 @@ done
 
 # only colors for terminal output
 [ ! "$EDIT" ] && [ -t 1 ] && . $THISDIR/color.sh
+[ "$#" -gt 0 ] && PROJECT="$@"
 
 DATA=$RM_CONFIG/issues.json
 
@@ -172,7 +173,7 @@ find_new_project() {
 	local issueid="$1"
 
 	local project=$(grep "^+$issueid newpj" $TMPDIR/pjtree.diff | cut -f3 -d' ')
-	[ "$parent" ] && echo $parent && return
+	[ "$project" ] && echo $project && return
 	# unchange
 }
 
@@ -181,7 +182,7 @@ find_new_parent_project() {
 	true
 }
 
-parse_new_line() {
+update_pjtree_ticket() {
 	local issueid=$1
 	local newline="$2"
 	local oldline="$3"
@@ -280,14 +281,15 @@ get_list_of_changed_tickets() {
 
 # DONE
 # - 既存の issue の状態、トラッカー、関連、サブジェクトの更新
-#
-# TODO
-# - 新しい issue の追加
-# - issue の削除
 # - issue の更新
 #   - 親子関係は、直接変更しなかった issue も影響を受けることがあり、複雑である。
 #   - 事前に parent tree map を保持しておいて、draft 編集後にどのように構造が変わったかチェックする。
 #   - project の変更、これも親プロジェクトの変更とリンクする話
+#
+# TODO
+# - 新しい issue の追加
+# - issue の削除
+# - プロジェクト間の階層構造の更新
 edit_tree() {
 	local draft="$1"
 	local newline=
@@ -307,7 +309,7 @@ edit_tree() {
 		oldline="$(grep "^- *$id " $TMPDIR/out.diff)"
 		if [ "$newline" ] && [ "$oldline" ] ; then
 			echo update_ticket $id
-			parse_new_line "$id" "$newline" "$oldline"
+			update_pjtree_ticket "$id" "$newline" "$oldline"
 		elif [ "$newline" ] ; then
 			echo create_ticket $id
 		elif [ "$oldline" ] ; then
