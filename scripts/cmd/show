@@ -47,7 +47,8 @@ if [[ "$ISSUEID" =~ ^L ]] ; then
 	exit
 fi
 
-update_local_cache || exit 1
+update_local_cache_task $ISSUEID || exit 1
+! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
 # TODO: better file name
 tmpjson=$TMPD/$ISSUEID/issue.json

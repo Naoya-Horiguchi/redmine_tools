@@ -282,6 +282,13 @@ update_relations2() {
 	done
 }
 
+check_issue_exist() {
+	local issueid="$1"
+
+	jq ".issues[] | select(.id == $issueid)" $RM_CONFIG/issues.json > $TMPDIR/issue.exist
+	test -s $TMPDIR/issue.exist
+}
+
 __check_opened() {
 	local issueid=$1
 

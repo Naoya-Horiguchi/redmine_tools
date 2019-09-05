@@ -50,6 +50,7 @@ if [[ "$ISSUEID" =~ ^L ]] ; then
 	exit 0
 fi
 
-update_local_cache || exit 1
+update_local_cache_task $ISSUEID || exit 1
+! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
 update_issue3 $ISSUEID

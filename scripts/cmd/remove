@@ -23,6 +23,7 @@ if [[ "$ISSUEID" =~ ^L ]] ; then
 fi
 
 update_local_cache_task $ISSUEID || exit 1
+! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
 echo "You really remove issue $ISSUEID (subject: $(issueid_to_subject $ISSUEID))? (y: yes, n: no)"
 read input
