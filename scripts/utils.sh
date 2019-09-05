@@ -149,6 +149,14 @@ upload_ticket() {
 	__upload_ticket $outjson $issueid
 }
 
+remove_ticket() {
+	local issueid="$1"
+	local api="/issues/${issueid}.json"
+	local requestbase="$RM_BASEURL${api}?key=${RM_KEY}"
+
+	curl ${INSECURE:+-k} -s -X DELETE "${requestbase}"
+}
+
 __curl_limit() {
 	local api="$1"
 	local out="$2"
@@ -272,6 +280,13 @@ update_relations2() {
 		echo "$line" > $TMPDIR/relation.json
 		create_relation $issueid $TMPDIR/relation.json || exit 1
 	done
+}
+
+check_issue_exist() {
+	local issueid="$1"
+
+	jq ".issues[] | select(.id == $issueid)" $RM_CONFIG/issues.json > $TMPDIR/issue.exist
+	test -s $TMPDIR/issue.exist
 }
 
 __check_opened() {
@@ -400,6 +415,21 @@ update_local_cache_task() {
 	jq -r --slurpfile new_items $TMPDIR/tmp.update_local_cache_task_new \
 	   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json || return 1
 	mv $TMPDIR/tmp.issues.json $RM_CONFIG/issues.json
+}
+
+rmeove_ticket_from_local_cache() {
+	local id="$1"
+
+	# saving local cache into saved directory
+	jq -r ".issues[] | select(.id == $ISSUEID)" $RM_CONFIG/issues.json > $TMPD/$ISSUEID/issue.deleted.json
+	jq "del(.issues[] | select(.id == $id))" $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json
+	if [ "$(wc -c $RM_CONFIG/issues.json | cut -f1 -d' ')" -eq "$(wc -c $TMPDIR/tmp.issues.json | cut -f1 -d' ')" ] ; then
+		# not found
+		return 1
+	else
+		mv $TMPDIR/tmp.issues.json $RM_CONFIG/issues.json
+		return 0
+	fi
 }
 
 declare -A SUBTASK_TABLE
@@ -753,12 +783,17 @@ update_new_issue() {
 		echo "new ticket: $issueid"
 		mkdir -p $TMPD/$issueid
 		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
+		( update_local_cache_task $issueid ) &
 	elif [ "$NEWLOCALTID" ] ; then
 		# clock_copy
 		echo "new ticket: $NEWLOCALTID"
 		mkdir -p $TMPD/$NEWLOCALTID/
 		rsync -a $TMPDIR/new/ $TMPD/$NEWLOCALTID/
 	fi
+}
+
+issueid_to_subject() {
+	jq -r ".issues[] | select(.id == $ISSUEID) | .subject" $RM_CONFIG/issues.json
 }
 
 if [ "$RM_FORMAT" = markdown ] ; then

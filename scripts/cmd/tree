@@ -222,6 +222,8 @@ update_pjtree_ticket() {
 		for relstring in $newrel2 ; do
 			generate_relation_json "$issueid" "$relstring" > $TMPDIR/upload_relation.json
 			create_relation $issueid $TMPDIR/upload_relation.json || exit 1
+			# update opponent issue
+			( update_local_cache_task ${relstring:1} ) &
 		done
 	fi
 
@@ -239,11 +241,11 @@ update_pjtree_ticket() {
 			if [ "$relid" ] ; then
 				echo "delete_relation $relid"
 				delete_relation "$relid" || exit 1
+				( update_local_cache_task ${relstring:1} ) &
 			fi
 		done
 	fi
 
-	# echo "[$tracker, $status, $newrel, $oldrel, $subject]"
 	cat <<EOF > $TMPDIR/update.json
 { "issue": {
   "status_id": $(status_to_id $status),
@@ -271,6 +273,20 @@ EOF
 	fi
 
 	( update_local_cache_task $issueid ) &
+}
+
+create_pjtree_ticket() {
+	local id="$1"
+	local line="$2"
+
+	true
+}
+
+remove_pjtree_ticket() {
+	local id="$1"
+
+	remove_ticket $id || exit 1
+	rmeove_ticket_from_local_cache $id
 }
 
 get_list_of_changed_tickets() {
@@ -311,9 +327,11 @@ edit_tree() {
 			echo update_ticket $id
 			update_pjtree_ticket "$id" "$newline" "$oldline"
 		elif [ "$newline" ] ; then
-			echo create_ticket $id
+			echo create_ticket "$id"
+			create_pjtree_ticket "$id" "$newline"
 		elif [ "$oldline" ] ; then
-			echo remove_ticket $id
+			echo remove_ticket "$id"
+			remove_pjtree_ticket "$id"
 		fi
 	done
 

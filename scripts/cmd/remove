@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# Usage
+#   redmine remove id
+#
+# Description
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+ISSUEID=$1
+
+if ! check_ticket_id_format $ISSUEID ; then
+	echo "invalid issueid format" >&2
+	exit 1
+fi
+
+if [[ "$ISSUEID" =~ ^L ]] ; then
+	echo "Removing local ticket not supported. (maybe you don't have to do this)"
+	exit 0
+fi
+
+update_local_cache_task $ISSUEID || exit 1
+! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
+
+echo "You really remove issue $ISSUEID (subject: $(issueid_to_subject $ISSUEID))? (y: yes, n: no)"
+read input
+if [ "$input" != y ] && [ "$input" != Y ] ; then
+	echo cancelled
+	return 0
+fi
+
+# keep json snippet into save directory
+jq -r ".issues[] | select(.id == $ISSUEID)" $RM_CONFIG/issues.json > $TMPD/$ISSUEID/issue.deleted.json
+
+remove_ticket $ISSUEID || exit 1
+rmeove_ticket_from_local_cache $ISSUEID
+echo "successfully removed issue $ISSUEID"
+
