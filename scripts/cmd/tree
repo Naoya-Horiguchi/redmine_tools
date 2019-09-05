@@ -267,6 +267,7 @@ EOF
 	fi
 
 	# cat $TMPDIR/update.json
+	# TODO: イテレートしたら、誤った issue に関連を与えてしまわないだろうか。
 	__upload_ticket $TMPDIR/update.json $issueid || return 1
 	if [ -s "$TMPDIR/upload_relations.json" ] ; then
 		echo "update relations"
@@ -275,11 +276,52 @@ EOF
 	( update_local_cache_task $issueid ) &
 }
 
+# 追加行は ID がまだ決まっていないので、識別のために N で始まる仮の ID を用いる。
 create_pjtree_ticket() {
-	local id="$1"
+	local issueid="$1"
 	local line="$2"
 
-	true
+	local metafield="$(echo "$line" | awk -F'[><]' '{print $2}')"
+	local tracker="$(echo $metafield | cut -f1 -d\|)"
+	local status="$(echo $metafield | cut -f2 -d\|)"
+	local newrelations="$(echo "$line" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	local subject="$(echo "$line" | cut -f2- -d \> | sed 's/^ *//')"
+
+	# TODO: remove duplicate
+	cat <<EOF > $TMPDIR/update.json
+{ "issue": {
+  "status_id": $(status_to_id $status),
+  "tracker_id": $(tracker_to_id $tracker),
+  "subject": "${subject//\"/\\\"}"
+}}
+EOF
+
+cat $TMPDIR/pjtree.diff
+	local newparent="$(find_new_parent $issueid)"
+echo "--> $issueid $newparent"
+	if [ "$newparent" ] ; then
+		jq ".issue.parent_issue_id += \"$newparent\"" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
+
+	local newproject="$(find_new_project $issueid)"
+echo "--> $issueid $newproject"
+	if [ "$newproject" ] ; then
+		jq ".issue.project_id += ${newproject##PJ}" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
+
+	# TODO: handle relation
+	mkdir -p $TMPDIR/$issueid
+	__create_ticket $TMPDIR/update.json $issueid > $TMPDIR/$issueid/create.result.json
+	local newissueid=$(jq -r ".issue.id" $TMPDIR/$issueid/create.result.json)
+	[ "$newissueid" == null ] && echo "failed to get new ticket ID" && return 1
+
+	if [ -s "$TMPDIR/upload_relations.json" ] ; then
+		echo "update relations"
+	fi
+
+	( update_local_cache_task $newissueid ) &
 }
 
 remove_pjtree_ticket() {
@@ -295,17 +337,30 @@ get_list_of_changed_tickets() {
 	grep "^[+-] " "$file" | awk '{print $2}' | sort | uniq
 }
 
+replace_new_ticket_line_with_number_id() {
+	local draft="$1"
+
+	gawk -i inplace '{
+		if ($0 ~ /^ *new /) {
+			print gensub(/new/, "N"NR, 1, $0)
+		} else {
+			print $0
+		}
+	}' $draft
+}
+
 # DONE
 # - 既存の issue の状態、トラッカー、関連、サブジェクトの更新
 # - issue の更新
 #   - 親子関係は、直接変更しなかった issue も影響を受けることがあり、複雑である。
 #   - 事前に parent tree map を保持しておいて、draft 編集後にどのように構造が変わったかチェックする。
 #   - project の変更、これも親プロジェクトの変更とリンクする話
+#   - issue の削除
+# - 新しい issue の追加
 #
 # TODO
-# - 新しい issue の追加
-# - issue の削除
 # - プロジェクト間の階層構造の更新
+# - 不正なフォーマットを正しく無視する
 edit_tree() {
 	local draft="$1"
 	local newline=
@@ -313,6 +368,7 @@ edit_tree() {
 
 	cp $TMPDIR/out $TMPDIR/out.copy
 	$EDITOR $draft
+	replace_new_ticket_line_with_number_id $draft
 	diff -u $TMPDIR/out.copy $TMPDIR/out > $TMPDIR/out.diff
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out.copy | sort -k1n > $TMPDIR/pjtree.before || exit 1
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out | sort -k1n > $TMPDIR/pjtree.after || exit 1
