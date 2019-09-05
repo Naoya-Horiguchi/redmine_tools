@@ -783,6 +783,7 @@ update_new_issue() {
 		echo "new ticket: $issueid"
 		mkdir -p $TMPD/$issueid
 		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
+		( update_local_cache_task $issueid ) &
 	elif [ "$NEWLOCALTID" ] ; then
 		# clock_copy
 		echo "new ticket: $NEWLOCALTID"
