@@ -275,6 +275,20 @@ EOF
 	( update_local_cache_task $issueid ) &
 }
 
+create_pjtree_ticket() {
+	local id="$1"
+	local line="$2"
+
+	true
+}
+
+remove_pjtree_ticket() {
+	local id="$1"
+
+	remove_ticket $id || exit 1
+	rmeove_ticket_from_local_cache $id
+}
+
 get_list_of_changed_tickets() {
 	local file="$1"
 
@@ -313,9 +327,11 @@ edit_tree() {
 			echo update_ticket $id
 			update_pjtree_ticket "$id" "$newline" "$oldline"
 		elif [ "$newline" ] ; then
-			echo create_ticket $id
+			echo create_ticket "$id"
+			create_pjtree_ticket "$id" "$newline"
 		elif [ "$oldline" ] ; then
-			echo remove_ticket $id
+			echo remove_ticket "$id"
+			remove_pjtree_ticket "$id"
 		fi
 	done
 
