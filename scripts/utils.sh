@@ -796,6 +796,26 @@ issueid_to_subject() {
 	jq -r ".issues[] | select(.id == $ISSUEID) | .subject" $RM_CONFIG/issues.json
 }
 
+declare -A SUBPJ_TABLE
+get_project_table() {
+	local data=$1
+
+	echo -n "" > $TMPDIR/top_level_projects
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".projects[] | [.id, .parent.id, .status, .subject] | @tsv" $data | sort -k1n) ; do
+		local projectid=$(echo $line | cut -f1)
+		local parentid=$(echo $line | cut -f2)
+		if [ "$parentid" ] ; then
+			SUBPJ_TABLE[$parentid]="${SUBPJ_TABLE[$parentid]} $projectid"
+		else
+			echo $projectid >> $TMPDIR/top_level_projects
+		fi
+		# TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
+	done
+	IFS="$ifs"
+}
+
 if [ "$RM_FORMAT" = markdown ] ; then
 	RM_DRAFT_FILENAME="draft.md"
 else

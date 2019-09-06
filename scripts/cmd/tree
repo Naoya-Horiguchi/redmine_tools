@@ -1,12 +1,12 @@
 #!/bin/bash
 #
 # Usage
-#   redmine tree [options] [pj ...]
+#   redmine tree [options] [pjspec ...]
 #
 # Description
 #   Print project tree to standard output. If you give project IDs as parameters,
-#   project trees under specified projects are printed. If you give no parameter,
-#   trees from all projects are printed.
+#   the output only includes project trees under specified projects are printed.
+#   If you give no parameter, all project trees are printed.
 #
 # Options
 #   -e            edit project tree
@@ -51,26 +51,6 @@ done
 [ "$#" -gt 0 ] && PROJECT="$@"
 
 DATA=$RM_CONFIG/issues.json
-
-declare -A SUBPJ_TABLE
-get_project_table() {
-	local data=$1
-
-	echo -n "" > $TMPDIR/top_level_projects
-	local ifs="$IFS"
-	IFS=$'\n'
-	for line in $(jq -r ".projects[] | [.id, .parent.id, .status, .subject] | @tsv" $data | sort -k1n) ; do
-		local projectid=$(echo $line | cut -f1)
-		local parentid=$(echo $line | cut -f2)
-		if [ "$parentid" ] ; then
-			SUBPJ_TABLE[$parentid]="${SUBPJ_TABLE[$parentid]} $projectid"
-		else
-			echo $projectid >> $TMPDIR/top_level_projects
-		fi
-		# TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
-	done
-	IFS="$ifs"
-}
 
 show_task_subtree() {
 	local taskid=$1
@@ -190,14 +170,17 @@ update_pjtree_ticket() {
 	local tracker="$(echo $metafield | cut -f1 -d\|)"
 	local status="$(echo $metafield | cut -f2 -d\|)"
 	# TODO: 不完全、タイトルの先頭に () がある場合と区別できないといけない
-	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
-	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
+	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
 	local newrel="$(echo "$newline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
 	local newrel2=
 	local oldrel="$(echo "$oldline" | awk -F'[)(]' '{print $2}' | tr ',' ' ')"
 	local oldrel2=
 
 	local subject="$(echo "$newline" | cut -f2- -d \> | sed 's/^ *//')"
+	if [ "$newrelations" ] ; then
+		subject="$(echo "$newline" | cut -f2- -d \) | sed 's/^ *//')"
+	fi
 
 	# echo "newrelations: [$newrelations]"
 	# echo "newline: [$newline]"
@@ -217,7 +200,7 @@ update_pjtree_ticket() {
 			fi
 			newrel2="$newrel2 $rel"
 		done
-		echo "new relations: $newrel2"
+		[ "$newrel2" ] && echo "new relations: $newrel2"
 
 		for relstring in $newrel2 ; do
 			generate_relation_json "$issueid" "$relstring" > $TMPDIR/upload_relation.json
@@ -234,7 +217,7 @@ update_pjtree_ticket() {
 			fi
 			oldrel2="$oldrel2 $rel"
 		done
-		echo "old relations: $oldrel2"
+		[ "$oldrel2" ] && echo "old relations: $oldrel2"
 
 		for relstring in $oldrel2 ; do
 			local relid=$(get_relation_from_server "$issueid" "$relstring")
@@ -296,16 +279,15 @@ create_pjtree_ticket() {
 }}
 EOF
 
-cat $TMPDIR/pjtree.diff
 	local newparent="$(find_new_parent $issueid)"
-echo "--> $issueid $newparent"
+	# echo "--> $issueid $newparent"
 	if [ "$newparent" ] ; then
 		jq ".issue.parent_issue_id += \"$newparent\"" $TMPDIR/update.json > $TMPDIR/update.json2
 		mv $TMPDIR/update.json2 $TMPDIR/update.json
 	fi
 
 	local newproject="$(find_new_project $issueid)"
-echo "--> $issueid $newproject"
+	# echo "--> $issueid $newproject"
 	if [ "$newproject" ] ; then
 		jq ".issue.project_id += ${newproject##PJ}" $TMPDIR/update.json > $TMPDIR/update.json2
 		mv $TMPDIR/update.json2 $TMPDIR/update.json
@@ -346,7 +328,7 @@ replace_new_ticket_line_with_number_id() {
 		} else {
 			print $0
 		}
-	}' $draft
+	}' $draft || exit 1
 }
 
 # DONE
@@ -373,7 +355,7 @@ edit_tree() {
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out.copy | sort -k1n > $TMPDIR/pjtree.before || exit 1
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out | sort -k1n > $TMPDIR/pjtree.after || exit 1
 	diff -u0 $TMPDIR/pjtree.before $TMPDIR/pjtree.after > $TMPDIR/pjtree.diff
-	cat $TMPDIR/pjtree.diff
+	# cat $TMPDIR/pjtree.diff
 
 	local changed_ids="$(get_list_of_changed_tickets $TMPDIR/out.diff)"
 	for id in $changed_ids ; do
@@ -386,8 +368,9 @@ edit_tree() {
 			echo create_ticket "$id"
 			create_pjtree_ticket "$id" "$newline"
 		elif [ "$oldline" ] ; then
-			echo remove_ticket "$id"
-			remove_pjtree_ticket "$id"
+			echo "Removing ticket from pjtree is a little too dangerous, so don't do it. If you really need, use remove command."
+			# Maybe we need be more careful not to unexpectedly remove ticket
+			# remove_pjtree_ticket "$id"
 		fi
 	done
 
@@ -395,13 +378,16 @@ edit_tree() {
 	update_local_cache
 }
 
+update_local_cache || exit 1
+
 get_project_table $RM_CONFIG/projects.json
 
 if [ "$PROJECT" == all ] ; then
 	PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
 fi
 
-for pjid in $PROJECT ; do
+for pjspec in $PROJECT ; do
+	pjid=$(pjspec_to_pjid $pjspec) || exit 1
 	show_project_tree $pjid >> $TMPDIR/out
 done
 

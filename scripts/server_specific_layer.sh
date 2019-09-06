@@ -44,3 +44,16 @@ user_to_id() {
 user_to_name() {
 	jq -r ".users[] | select(.id == $1) | .login" $RM_CONFIG/users.json
 }
+
+pjspec_to_pjid() {
+	local pjspec="$1"
+	local re='^[0-9]+$'
+
+	if [[ "$pjspec" =~ $re ]] ; then # if number, it's pjid itself.
+		echo "$pjspec"
+	else
+		# TODO: if found multiple record? -> first match
+		# TODO: escape input? what if pjspec contains ','?
+		jq -r ".projects[] | select(.name|test(\"$1\";\"i\")) | .id" $RM_CONFIG/projects.json
+	fi
+}

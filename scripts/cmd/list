@@ -1,15 +1,15 @@
 #!/bin/bash
 #
 # Usage
-#   redmine list [options]
+#   redmine list [options] [pjspec...]
 #
 # Description
-#   - オプションなしだとダウンロードなし、ローカルチケットも表示する
-#   - -A オプションを与えるとサーバの最新データをローカルキャッシュにコピー
+#   Print task list to standard output. If you give pjspec as a parameter,
+#   the tasks belonging to the specified project are printed.
+#   If you give no parameter, tasks of all projects are printed.
 #
 # Options
 #   -a user_id    filter ticket with given user (user ID or "me")
-#   -A|--all      show all possible tickets
 #   -h            show this message
 #
 # TODO:
@@ -21,8 +21,7 @@ show_help() {
 
 . $THISDIR/server_specific_layer.sh
 
-[ "$RM_LIST_LIMIT" ] && LIMIT=$RM_LIST_LIMIT
-[ ! "$LIMIT" ] && LIMIT=25
+PROJECT=all
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
@@ -30,10 +29,6 @@ while [[ $# -gt 0 ]] ; do
 			ASSIGNED="$2"
 			ASSIGNED_OPT="&assigned_to_id=$ASSIGNED"
 			shift 2
-			;;
-		-A|--all)
-			LIMIT=10000
-			shift
 			;;
 		-h)
 			show_help
@@ -47,6 +42,7 @@ while [[ $# -gt 0 ]] ; do
 done
 
 [ -t 1 ] && . $THISDIR/color.sh
+[ "$#" -gt 0 ] && PROJECT="$@"
 
 rm $RM_CONFIG/tmp.local_ticket_list 2> /dev/null
 
@@ -74,12 +70,27 @@ done
 
 update_local_cache || exit 1
 
-# get_metadata_table $RM_CONFIG/issues.json
+if [ "$PROJECT" == all ] ; then
+	PROJECT="$(jq -r ".projects[] | .id" $RM_CONFIG/projects.json | sort -k1n)"
+fi
 
-IFS=$'\t'
-jq -r -c '.issues[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv' $RM_CONFIG/issues.json | sort -k2 | tail -n $LIMIT | while read id update project tracker status subject ; do
-#	printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "$(get_meta_part $id)" "$subject"
-	printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-done > $RM_CONFIG/tmp.remote_ticket_list
+show_project_task_list() {
+	local pjid="$1"
 
-cat $RM_CONFIG/tmp.remote_ticket_list $RM_CONFIG/tmp.local_ticket_list | sort -k2 | column -t -s $'\t' | tail -n $LIMIT
+	echo "List of issues under project $pjid $(project_to_name $pjid):"
+	local ifs="$IFS"
+	IFS=$'\t'
+	jq -r -c ".issues[] | select(.project.id == $pjid) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+		# printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "$(get_meta_part $id)" "$subject"
+		printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+		# printf "%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "<$tracker|$status>" "$subject"
+	done
+	IFS="$ifs"
+}
+
+for pjspec in $PROJECT ; do
+	pjid=$(pjspec_to_pjid $pjspec) || exit 1
+	show_project_task_list $pjid >> $TMPDIR/out
+done
+
+cat $TMPDIR/out | expand
