@@ -178,7 +178,7 @@ update_pjtree_ticket() {
 	local oldrel2=
 
 	local subject="$(echo "$newline" | cut -f2- -d \> | sed 's/^ *//')"
-	if [ "$newrelations" ] ; then
+	if [ "$newrelations" != "$newline" ] ; then # new line has relations
 		subject="$(echo "$newline" | cut -f2- -d \) | sed 's/^ *//')"
 	fi
 
@@ -260,6 +260,7 @@ EOF
 }
 
 # 追加行は ID がまだ決まっていないので、識別のために N で始まる仮の ID を用いる。
+# TODO: 新規チケットに関連をもたせることができない
 create_pjtree_ticket() {
 	local issueid="$1"
 	local line="$2"
@@ -267,7 +268,7 @@ create_pjtree_ticket() {
 	local metafield="$(echo "$line" | awk -F'[><]' '{print $2}')"
 	local tracker="$(echo $metafield | cut -f1 -d\|)"
 	local status="$(echo $metafield | cut -f2 -d\|)"
-	local newrelations="$(echo "$line" | sed 's/.*(\([0-9\->|=#,]\+\)).*/\1/')"
+	# local newrelations="$(echo "$line" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
 	local subject="$(echo "$line" | cut -f2- -d \> | sed 's/^ *//')"
 
 	# TODO: remove duplicate
