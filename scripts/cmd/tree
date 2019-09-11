@@ -11,6 +11,8 @@
 # Options
 #   -e            edit project tree
 #   -o            exclude closed tickets
+#   -c            show closed tickets
+#   -C            hide closed tickets
 #   -h            show this message
 #
 # TODO:
@@ -19,8 +21,6 @@
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
-
-. $THISDIR/server_specific_layer.sh
 
 PROJECT=all
 EDIT=
@@ -35,8 +35,12 @@ while [[ $# -gt 0 ]] ; do
 			EDIT=true
 			shift 1
 			;;
-		-o)
-			HIDE_CLOSED=true
+		-c)
+			RM_SHOW_CLOSED=true
+			shift 1
+			;;
+		-C)
+			RM_SHOW_CLOSED=false
 			shift 1
 			;;
 		*)
@@ -57,7 +61,7 @@ show_task_subtree() {
 	local depth=$2
 	local childid=
 
-	if [ "$HIDE_CLOSED" ] ; then
+	if [ "$RM_SHOW_CLOSED" = "false" ] ; then
 		if status_closed "${STATUS_TABLE[$taskid]}" ; then
 			return 0
 		fi
@@ -367,6 +371,7 @@ edit_tree() {
 			update_pjtree_ticket "$id" "$newline" "$oldline"
 		elif [ "$newline" ] ; then
 			echo create_ticket "$id"
+			# TODO: show newly create issue id in standard output
 			create_pjtree_ticket "$id" "$newline"
 		elif [ "$oldline" ] ; then
 			echo "Removing ticket from pjtree is a little too dangerous, so don't do it. If you really need, use remove command."

@@ -10,6 +10,10 @@
 #
 # Options
 #   -a user_id    filter ticket with given user (user ID or "me")
+#   -c            show closed tickets
+#   -C            hide closed tickets
+#   -g            grouping by projects
+#   -s            show subprojects
 #   -h            show this message
 #
 # TODO:
@@ -19,9 +23,9 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
-. $THISDIR/server_specific_layer.sh
-
 PROJECT=all
+GROUPING=
+SHOW_SUBPROJECT=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
@@ -29,6 +33,22 @@ while [[ $# -gt 0 ]] ; do
 			ASSIGNED="$2"
 			ASSIGNED_OPT="&assigned_to_id=$ASSIGNED"
 			shift 2
+			;;
+		-c)
+			RM_SHOW_CLOSED=true
+			shift 1
+			;;
+		-C)
+			RM_SHOW_CLOSED=false
+			shift 1
+			;;
+		-g)
+			GROUPING=true
+			shift 1
+			;;
+		-s)
+			SHOW_SUBPROJECT=true
+			shift 1
 			;;
 		-h)
 			show_help
@@ -70,27 +90,66 @@ done
 
 update_local_cache || exit 1
 
-if [ "$PROJECT" == all ] ; then
-	PROJECT="$(jq -r ".projects[] | .id" $RM_CONFIG/projects.json | sort -k1n)"
-fi
-
 show_project_task_list() {
 	local pjid="$1"
 
 	echo "List of issues under project $pjid $(project_to_name $pjid):"
 	local ifs="$IFS"
 	IFS=$'\t'
-	jq -r -c ".issues[] | select(.project.id == $pjid) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
-		# printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "$(get_meta_part $id)" "$subject"
-		printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-		# printf "%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "<$tracker|$status>" "$subject"
-	done
+	if [ "$RM_SHOW_CLOSED" = "true" ] ; then
+		jq -r -c ".issues[] | select(.project.id == $pjid) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+		done
+	else
+		jq -r -c ".issues[] | select((.project.id == $pjid) and (.closed_on == null)) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+		done
+	fi
 	IFS="$ifs"
 }
 
-for pjspec in $PROJECT ; do
-	pjid=$(pjspec_to_pjid $pjspec) || exit 1
-	show_project_task_list $pjid >> $TMPDIR/out
-done
+show_global_task_list() {
+	local pjid="$@"
 
-cat $TMPDIR/out | expand
+	local ifs="$IFS"
+	IFS=$'\t'
+	if [ "$RM_SHOW_CLOSED" = "true" ] ; then
+		jq -r -c ".issues[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+		done
+	else
+		jq -r -c ".issues[] | select(.closed_on == null) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
+		done
+	fi
+	IFS="$ifs"
+}
+
+if [ "$SHOW_SUBPROJECT" ] ; then
+	get_project_table $RM_CONFIG/projects.json
+	if [ "$PROJECT" = all ] ; then
+		PROJECT="$(cat $TMPDIR/top_level_projects)"
+	else
+		PROJECT="$(pjspec_to_pjid $PROJECT)"
+	fi
+	PROJECT="$(get_subproject_list $PROJECT)"
+else
+	if [ "$PROJECT" == all ] ; then
+		PROJECT="$(jq -r ".projects[] | .id" $RM_CONFIG/projects.json | sort -k1n)"
+	else
+		PROJECT="$(pjspec_to_pjid $PROJECT)"
+	fi
+fi
+
+if [ "$GROUPING" = true ] ; then
+	for pjspec in $PROJECT ; do
+		pjid=$(pjspec_to_pjid $pjspec) || exit 1
+		show_project_task_list $pjid >> $TMPDIR/out
+	done
+	cat $TMPDIR/out | expand
+else
+	# TODO: filter with given projects
+	show_global_task_list $PROJECT > $TMPDIR/out
+	cat $TMPDIR/out | column -t -s $'\t'
+fi
+
