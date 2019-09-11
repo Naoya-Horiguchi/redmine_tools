@@ -32,9 +32,6 @@ if [ "$input" != y ] && [ "$input" != Y ] ; then
 	return 0
 fi
 
-# keep json snippet into save directory
-jq -r ".issues[] | select(.id == $ISSUEID)" $RM_CONFIG/issues.json > $TMPD/$ISSUEID/issue.deleted.json
-
 remove_ticket $ISSUEID || exit 1
 rmeove_ticket_from_local_cache $ISSUEID
 echo "successfully removed issue $ISSUEID"

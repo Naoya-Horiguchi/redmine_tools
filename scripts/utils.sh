@@ -31,27 +31,21 @@ __update_ticket() {
 	local subject="$(grep -i ^#\+subject: $file | sed 's|^#+subject: *||i')"
 	local issue="$(grep -i ^#\+issue: $file | sed 's|^#+issue: *||i')"
 	[ ! "$issue" ] && issue=$issueid
-	# project name/id のどちらを与えても project_id が得られる。
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
-	local project_id=$(jq -r ".projects[] | select(.name == \"$project\") | .id" $RM_CONFIG/projects.json)
-	[ ! "$project_id" ] && project_id=$project
+	local project_id="$(pjspec_to_pjid "$project")"
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
-	local tracker_id=$(jq -r ".trackers[] | select(.name == \"$tracker\") | .id" $RM_CONFIG/trackers.json)
-	[ ! "$tracker_id" ] && tracker_id=$tracker
-	# TODO: 大文字小文字区別せず
+	local tracker_id="$(trackerspec_to_trackerid "$tracker")"
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
-	local status_id=$(jq -r ".issue_statuses[] | select(.name == \"$status\") | .id" $RM_CONFIG/issue_statuses.json)
-	[ ! "$status_id" ] && status_id=$status
+	local status_id="$(statusspec_to_statusid "$status")"
 	local priority="$(grep -i ^#\+priority: $file | sed 's|^#+priority: *||i')"
-	local priority_id=$(jq -r ".issue_priorities[] | select(.name == \"$priority\") | .id" $RM_CONFIG/priorities.json)
-	[ ! "$priority_id" ] && priority_id=$priority
+	local priority_id="$(priorityspec_to_priorityid "$priority")"
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
 	# TODO: ユーザリストがない場合の対応
-	if [ "$RM_USERLIST" ] ; then
+	
+	if [ ! -s "$RM_CONFIG/users.json" ] ; then
 		local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
-		local assigned_id=$(jq -r ".users[] | select(.login == \"$assigned\") | .id" $RM_CONFIG/users.json)
-		[ ! "$assigned_id" ] && assigned_id=$assigned
+		local assigned_id="$(userspec_to_userid "$assigned")"
 	fi
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
@@ -540,7 +534,9 @@ edit_local_ticket() {
 
 	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
 	trap "date --iso-8601=seconds >> $TMPDIR/$issueid/.clock.log ; exit 0" 2
+	pushd $TMPD/$issueid
 	$EDITOR $draft
+	popd
 	trap 2
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
@@ -612,7 +608,9 @@ edit_issue3() {
 	local draft="$2"
 
 	while true ; do
+		pushd $(dirname $draft)
 		$EDITOR $draft
+		popd
 		ask_done_ratio_update3
 		diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
 		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "${draft}.edit.diff" ] ; then
@@ -760,7 +758,9 @@ update_new_issue() {
 	echo -n "$(date --iso-8601=seconds) " >> $TMPDIR/new/.clock.log
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
+		pushd $(dirname $draft)
 		$EDITOR $draft
+		popd
 		[ "$NEWLOCALTID" ] && break # new local ticket
 		echo
 		echo "You really upload this change? (y: yes, n: no, e: edit again)"
@@ -794,6 +794,45 @@ update_new_issue() {
 
 issueid_to_subject() {
 	jq -r ".issues[] | select(.id == $ISSUEID) | .subject" $RM_CONFIG/issues.json
+}
+
+declare -A SUBPJ_TABLE
+get_project_table() {
+	local data=$1
+
+	echo -n "" > $TMPDIR/top_level_projects
+	local ifs="$IFS"
+	IFS=$'\n'
+	for line in $(jq -r ".projects[] | [.id, .parent.id, .status, .subject] | @tsv" $data | sort -k1n) ; do
+		local projectid=$(echo $line | cut -f1)
+		local parentid=$(echo $line | cut -f2)
+		if [ "$parentid" ] ; then
+			SUBPJ_TABLE[$parentid]="${SUBPJ_TABLE[$parentid]} $projectid"
+		else
+			echo $projectid >> $TMPDIR/top_level_projects
+		fi
+		# TRACKER_TABLE[$taskid]="$(echo $line | cut -f4)"
+	done
+	IFS="$ifs"
+}
+
+__get_subproject() {
+	local pj="$1"
+	local subpj=
+
+	echo "$pj"
+	for subpj in ${SUBPJ_TABLE[$pj]} ; do
+		__get_subproject $subpj
+	done
+}
+
+get_subproject_list() {
+	local pj="$@"
+	local subpj=
+
+	for subpj in $pj ; do
+		__get_subproject $subpj
+	done
 }
 
 if [ "$RM_FORMAT" = markdown ] ; then

@@ -50,13 +50,10 @@ fi
 update_local_cache_task $ISSUEID || exit 1
 ! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
-# TODO: better file name
-tmpjson=$TMPD/$ISSUEID/issue.json
-tmpfile=$TMPD/$ISSUEID/draft.md
-relcsv=$TMPD/$ISSUEID/relations.csv
+tmpfile=$TMPDIR/tmp.show.txt
+__curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
+convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $TMPDIR/tmp.show.txt
 
-fetch_issue "$ISSUEID" "$relcsv" "$tmpjson" || exit 1
-__format_to_draft "$tmpjson" "$tmpfile" "$relcsv" || exit 1
 cat $tmpfile
 if [ "$SHOW_JOURNALS" ] ; then
 	echo

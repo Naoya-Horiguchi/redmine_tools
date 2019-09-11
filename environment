@@ -20,3 +20,8 @@ export INSECURE=
 
 # TBD
 export RM_USERLIST=
+
+# When calling 'list' or 'tree' subcommand, you can specify by command line
+# options whether closed issues are shown in the output or not. RM_SHOW_CLOSED
+# decides the default behavior of it. (Default: false)
+export RM_SHOW_CLOSED=false

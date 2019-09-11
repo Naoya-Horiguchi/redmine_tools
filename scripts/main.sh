@@ -66,6 +66,7 @@ REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
 . $THISDIR/utils.sh
 . $THISDIR/relations.sh
+. $THISDIR/server_specific_layer.sh
 
 # TODO: rename this
 TMPD=$RM_CONFIG/edit_memo
