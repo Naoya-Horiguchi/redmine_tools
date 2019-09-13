@@ -779,13 +779,11 @@ update_new_issue() {
 	echo "$(date --iso-8601=seconds)" >> $TMPDIR/new/.clock.log
 
 	if [ "$issueid" ] ; then
-		# clock_copy
 		echo "new ticket: $issueid"
 		mkdir -p $TMPD/$issueid
 		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
 		( update_local_cache_task $issueid ) &
 	elif [ "$NEWLOCALTID" ] ; then
-		# clock_copy
 		echo "new ticket: $NEWLOCALTID"
 		mkdir -p $TMPD/$NEWLOCALTID/
 		rsync -a $TMPDIR/new/ $TMPD/$NEWLOCALTID/
