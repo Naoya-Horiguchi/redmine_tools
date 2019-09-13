@@ -20,14 +20,6 @@ show_help() {
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
-		-n)
-			NO_DOWNLOAD=true
-			shift 1
-			;;
-		-f)
-			FORCE_UPDATE=true
-			shift 1
-			;;
 		-h)
 			show_help
 			exit 0

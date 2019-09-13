@@ -779,13 +779,11 @@ update_new_issue() {
 	echo "$(date --iso-8601=seconds)" >> $TMPDIR/new/.clock.log
 
 	if [ "$issueid" ] ; then
-		# clock_copy
 		echo "new ticket: $issueid"
 		mkdir -p $TMPD/$issueid
 		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
 		( update_local_cache_task $issueid ) &
 	elif [ "$NEWLOCALTID" ] ; then
-		# clock_copy
 		echo "new ticket: $NEWLOCALTID"
 		mkdir -p $TMPD/$NEWLOCALTID/
 		rsync -a $TMPDIR/new/ $TMPD/$NEWLOCALTID/
@@ -832,6 +830,26 @@ get_subproject_list() {
 
 	for subpj in $pj ; do
 		__get_subproject $subpj
+	done
+}
+
+__get_project_tree() {
+	local pj="$1"
+	local depth="$2"
+	local subpj=
+
+	printf "%$[depth*2]s%-4s %s\n" "" "$pj" "$(project_id_to_name $pj)"
+	# echo "  $pj => ${SUBPJ_TABLE[$pj]}"
+	for subpj in ${SUBPJ_TABLE[$pj]} ; do
+		__get_project_tree $subpj $[depth+1]
+	done
+}
+
+get_project_tree() {
+	local subpj=
+
+	for subpj in $@ ; do
+		__get_project_tree $subpj 0
 	done
 }
 
