@@ -28,4 +28,9 @@ done
 
 ISSUEID=$1
 
+if ! check_ticket_id_format $ISSUEID ; then
+	echo "invalid issueid format" >&2
+	exit 1
+fi
+
 open_with_browser $RM_BASEURL/issues/$ISSUEID

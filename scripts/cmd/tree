@@ -10,7 +10,6 @@
 #
 # Options
 #   -e            edit project tree
-#   -o            exclude closed tickets
 #   -c            show closed tickets
 #   -C            hide closed tickets
 #   -p            show project tree

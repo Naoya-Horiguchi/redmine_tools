@@ -1,9 +1,12 @@
 #!/bin/bash
 #
 # Usage
-#   redmine remove id
+#   redmine remove <ticket_id>
 #
 # Description
+#   Remove the specified ticket from Redmine server, so you have to be
+#   careful not to lose data. The data backup will be saved on server
+#   under cache directory ($RM_CONFIG/edit_memo/$ticketid).
 #
 
 show_help() {
@@ -34,5 +37,5 @@ fi
 
 remove_ticket $ISSUEID || exit 1
 rmeove_ticket_from_local_cache $ISSUEID
-echo "successfully removed issue $ISSUEID"
+echo "successfully removed issue $ISSUEID, and the data is saved on $TMPD/$ISSUEID/"
 
