@@ -11,7 +11,7 @@ RedMine に固有の機能以外に、自前に以下の機能を提供する。
 * `jq` と `gawk` をインストールする。
 * 対象となる RedMine 上の URL と API key を確認する。
 * bash 形式の設定ファイル (`environment` を参考に) に環境変数をセットして source しておく。
-* `sudo make install` を実行する。
+* `~/.bashrc` から `redmine.bash` を source する。
 * 初回設定時は `redmine config --update` で対象 RedMine サーバ固有の情報を取得する。
 
 上記準備が完了すれば、チケットの一覧 (list)・閲覧 (show)・作成 (new)・編集 (edit) などの通常の操作を実行できる。
