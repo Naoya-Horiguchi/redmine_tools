@@ -835,6 +835,26 @@ get_subproject_list() {
 	done
 }
 
+__get_project_tree() {
+	local pj="$1"
+	local depth="$2"
+	local subpj=
+
+	printf "%$[depth*2]s%-4s %s\n" "" "$pj" "$(project_id_to_name $pj)"
+	# echo "  $pj => ${SUBPJ_TABLE[$pj]}"
+	for subpj in ${SUBPJ_TABLE[$pj]} ; do
+		__get_project_tree $subpj $[depth+1]
+	done
+}
+
+get_project_tree() {
+	local subpj=
+
+	for subpj in $@ ; do
+		__get_project_tree $subpj 0
+	done
+}
+
 if [ "$RM_FORMAT" = markdown ] ; then
 	RM_DRAFT_FILENAME="draft.md"
 else

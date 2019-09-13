@@ -13,6 +13,7 @@
 #   -o            exclude closed tickets
 #   -c            show closed tickets
 #   -C            hide closed tickets
+#   -p            show project tree
 #   -h            show this message
 #
 # TODO:
@@ -24,13 +25,10 @@ show_help() {
 
 PROJECT=all
 EDIT=
+PJTREE_ONLY=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
-		-h)
-			show_help
-			exit 0
-			;;
 		-e)
 			EDIT=true
 			shift 1
@@ -42,6 +40,14 @@ while [[ $# -gt 0 ]] ; do
 		-C)
 			RM_SHOW_CLOSED=false
 			shift 1
+			;;
+		-p)
+			PJTREE_ONLY=true
+			shift 1
+			;;
+		-h)
+			show_help
+			exit 0
 			;;
 		*)
 			break
@@ -387,6 +393,13 @@ edit_tree() {
 update_local_cache || exit 1
 
 get_project_table $RM_CONFIG/projects.json
+
+# TODO: better name b/w generate_project_table and get_project_table
+if [ "$PJTREE_ONLY" = true ] ; then
+	PROJECT="$(cat $TMPDIR/top_level_projects)"
+	get_project_tree $PROJECT
+	exit 0
+fi
 
 if [ "$PROJECT" == all ] ; then
 	PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
