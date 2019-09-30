@@ -47,8 +47,6 @@ pjspec_to_pjid() {
 	echo $out
 }
 
-
-
 priority_to_id() {
 	jq -r ".issue_priorities[] | select(.name == \"$1\") | .id" $RM_CONFIG/priorities.json
 }
@@ -115,6 +113,10 @@ userspec_to_userid() {
 		# TODO: escape input? what if pjspec contains ','?
 		jq -r ".users[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/users.json
 	fi
+}
+
+issueid_to_subject() {
+	jq -r ".issues[] | select(.id == $1) | .subject" $RM_CONFIG/issues.json
 }
 
 # TODO: add some for version
