@@ -4,9 +4,14 @@
 #   redmine clock [options] [start_date] [end_date]
 #
 # Description
+#   This command traverse cache directory ($RM_CONFIG/edit_memo) and collect
+#   clock info, then show summary between start_date and end_date.
 #
 # Options
 #   -h            show this message
+#
+# TODO:
+#  - multiple clock range could overlap, which should be divided by the multiplicity.
 #
 
 show_help() {
