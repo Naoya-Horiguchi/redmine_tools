@@ -8,6 +8,8 @@
 #   careful not to lose data. The data backup will be saved on server
 #   under cache directory ($RM_CONFIG/edit_memo/$ticketid).
 #
+# TODO:
+#  - how do we find the reomved issues on server-side (by other users)
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
