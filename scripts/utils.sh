@@ -179,15 +179,15 @@ __curl_limit() {
 __curl() {
 	local api="$1"
 	local out="$2"
-	local tmpf=$(mktemp)
 	local data="$3"
+	local tmpf=$TMPDIR/.tmp.$FUNCNAME
 
 	[ ! "$out" ] && echo "invalid input" && return 1
 	[ "$VERBOSE" ] && echo "curl ${INSECURE:+-k} -s -o $tmpf \"$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}\""
 	curl ${INSECURE:+-k} -s -o $tmpf "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" || return 1
 	if [ -s "$tmpf" ] ; then
 		mkdir -p $(dirname $out)
-		mv $tmpf $out
+		cp $tmpf $out
 	else
 		return 1
 	fi
@@ -296,7 +296,7 @@ __check_opened() {
 		echo "Issue $issueid is opened by other process."
 		echo "Please edit $TMPD/$issueid/.clock.log and resolved unclosed clock"
 		return 1
-	elif [ "$tailsize" -eq 52 ] ; then
+	elif [ "$tailsize" -eq 51 ] || [ "$tailsize" -eq 52 ] ; then
 		return 0
 	else
 		echo "clock log of issue $issueid is broken."
@@ -308,11 +308,13 @@ __open_clock() {
 	local issueid=$1
 	mkdir -p $TMPD/$issueid
 	echo -n "$(date --iso-8601=seconds) " >> $TMPD/$issueid/.clock.log
+	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
 }
 
 __close_clock() {
 	local issueid=$1
 	trap 2
+	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
 }
 

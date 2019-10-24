@@ -11,6 +11,7 @@ redmine() {
 	if [ "$subcmd" == edit ] ; then
 		local issueid=$2
 		local subject="$(jq -r ".issues[] | select(.id == $issueid) | .subject" $RM_CONFIG/issues.json)"
+		[ "$issueid" -gt 0 ] && mkdir -p "$RM_CONFIG/edit_memo/$issueid"
 		if [ -e "$RM_CONFIG/edit_memo/$issueid" ] ; then
 			PROMPT_COMMAND=''
 			# [ "$subject" ] && PROMPT_COMMAND='echo -e "\033]2; RM#'$issueid $subject'\a"'

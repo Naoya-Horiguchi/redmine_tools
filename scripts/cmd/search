@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# Usage
+#   redmine search [options] <search string>
+#
+# Description
+#
+# Options
+#   -o            search only over open issues (TODO)
+#   -b            open with browser
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+OPEN_ISSUE=0
+BROWSER=
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-o)
+			OPEN_ISSUE=1
+			shift
+			;;
+		-b)
+			BROWSER=true
+			shift
+			;;
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+SCOPE=all
+
+urlencode() {
+	echo -n "$1" | nkf -WwMQ | sed 's/=$//g' | tr = % | tr -d '\n'
+}
+
+get_url_string() {
+	local str=""
+
+	for s in $@ ; do
+		str="${str}+$(urlencode $s)"
+	done
+	echo -n ${str##+}
+}
+
+SEARCH_STRING=""
+cat <<EOF > $TMPDIR/search_data
+q=$(get_url_string $@)
+utf8=%E2%9C%93
+EOF
+# q=$(echo $@ | tr ' ' '+')
+# titles_only=1
+# utf8=%E2%9C%93
+# utf8=✓
+# scope=
+# open_issues=$OPEN_ISSUE
+
+ORIG_IFS="$IFS"
+IFS=$'\n'
+for line in $(cat $TMPDIR/search_data) ; do
+	SEARCH_STRING="${SEARCH_STRING}&$line"
+done
+IFS="$ORIG_IFS"
+
+SEARCH_STRING="${SEARCH_STRING##&}"
+
+if [ "$BROWSER" ] ; then
+	echo google-chrome "https://nhoriguchi-redmine.japaneast.cloudapp.azure.com/search?${SEARCH_STRING}"
+	google-chrome "https://nhoriguchi-redmine.japaneast.cloudapp.azure.com/search?${SEARCH_STRING}"
+else
+	[ "$VERBOSE" ] && echo curl -k -s -o $TMPDIR/search.json "$RM_BASEURL/search.json?key=$RM_KEY&${SEARCH_STRING}"
+	curl -k -s -o $TMPDIR/search.json "$RM_BASEURL/search.json?key=$RM_KEY&${SEARCH_STRING}"
+	jq -r ".results[] | [.datetime, .title] | @tsv" $TMPDIR/search.json
+fi
