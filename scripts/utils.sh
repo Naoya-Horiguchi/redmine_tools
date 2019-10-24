@@ -179,15 +179,15 @@ __curl_limit() {
 __curl() {
 	local api="$1"
 	local out="$2"
-	local tmpf=$(mktemp)
 	local data="$3"
+	local tmpf=$TMPDIR/.tmp.$FUNCNAME
 
 	[ ! "$out" ] && echo "invalid input" && return 1
 	[ "$VERBOSE" ] && echo "curl ${INSECURE:+-k} -s -o $tmpf \"$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}\""
 	curl ${INSECURE:+-k} -s -o $tmpf "$RM_BASEURL${api}?key=$RM_KEY${data:+&$data}" || return 1
 	if [ -s "$tmpf" ] ; then
 		mkdir -p $(dirname $out)
-		mv $tmpf $out
+		cp $tmpf $out
 	else
 		return 1
 	fi
