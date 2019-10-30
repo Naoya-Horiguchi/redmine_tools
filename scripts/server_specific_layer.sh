@@ -119,4 +119,8 @@ issueid_to_subject() {
 	jq -r ".issues[] | select(.id == $1) | .subject" $RM_CONFIG/issues.json
 }
 
+issueid_to_pjid() {
+	jq -r ".issues[] | select(.id == $1) | .project.id" $RM_CONFIG/issues.json
+}
+
 # TODO: add some for version

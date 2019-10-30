@@ -13,6 +13,7 @@
 #   -c            show closed tickets
 #   -C            hide closed tickets
 #   -p            show project tree
+#   -t ticket_id  show subtree under the given ticket
 #   -h            show this message
 #
 # TODO:
@@ -26,6 +27,7 @@ show_help() {
 PROJECT=all
 EDIT=
 PJTREE_ONLY=
+TICKET_SUBTREE=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
@@ -44,6 +46,10 @@ while [[ $# -gt 0 ]] ; do
 		-p)
 			PJTREE_ONLY=true
 			shift 1
+			;;
+		-t)
+			TICKET_SUBTREE=$2
+			shift 2
 			;;
 		-h)
 			show_help
@@ -110,6 +116,17 @@ show_project_task_tree() {
 	# echo ${!RELATION_TABLE[@]}
 	# echo ${RELATION_TABLE[*]}
 	show_task_tree $[depth+1]
+}
+
+show_ticket_subtree() {
+	local tid="$1"
+	local projectid="$(issueid_to_pjid $tid)"
+
+	jq ".issues[] | select(.project.id == $projectid)" $DATA > $TMPDIR/pj$projectid
+	printf "%$[depth*2]s%-4s %s\n" "" "PJ$projectid" "$(project_id_to_name $projectid)"
+	get_subtask_table $TMPDIR/pj$projectid
+	get_relation_table $TMPDIR/pj$projectid
+	show_task_subtree "$tid" 1
 }
 
 project_id_to_name() {
@@ -395,23 +412,29 @@ edit_tree() {
 
 update_local_cache || exit 1
 
-get_project_table $RM_CONFIG/projects.json
+if [ "$TICKET_SUBTREE" ] ; then
+	PROJECT= # get project id
 
-# TODO: better name b/w generate_project_table and get_project_table
-if [ "$PJTREE_ONLY" = true ] ; then
-	PROJECT="$(cat $TMPDIR/top_level_projects)"
-	get_project_tree $PROJECT
-	exit 0
+	show_ticket_subtree $TICKET_SUBTREE > $TMPDIR/out
+else
+	get_project_table $RM_CONFIG/projects.json
+
+	# TODO: better name b/w generate_project_table and get_project_table
+	if [ "$PJTREE_ONLY" = true ] ; then
+		PROJECT="$(cat $TMPDIR/top_level_projects)"
+		get_project_tree $PROJECT
+		exit 0
+	fi
+
+	if [ "$PROJECT" == all ] ; then
+		PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
+	fi
+
+	for pjspec in $PROJECT ; do
+		pjid=$(pjspec_to_pjid $pjspec) || exit 1
+		show_project_tree $pjid >> $TMPDIR/out
+	done
 fi
-
-if [ "$PROJECT" == all ] ; then
-	PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
-fi
-
-for pjspec in $PROJECT ; do
-	pjid=$(pjspec_to_pjid $pjspec) || exit 1
-	show_project_tree $pjid >> $TMPDIR/out
-done
 
 if [ "$EDIT" ] ; then
 	edit_tree $TMPDIR/out

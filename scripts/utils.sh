@@ -49,14 +49,14 @@ __update_ticket() {
 	fi
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
-	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
+	# local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
 	# category
-	local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
+	# local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
 	# TODO: input in string format "<project> - <version>" is not supported yet.
-	if [ -s "$RM_CONFIG/versions/${project_id}.json" ] ; then
-		local version_id=$(jq -r ".versions[] | select(.name == \"$status\") | .id" $RM_CONFIG/versions/${project_id}.json)
-	fi
-	[ ! "$version_id" ] && version_id=$version
+	# if [ -s "$RM_CONFIG/versions/${project_id}.json" ] ; then
+	# 	local version_id=$(jq -r ".versions[] | select(.name == \"$status\") | .id" $RM_CONFIG/versions/${project_id}.json)
+	# fi
+	# [ ! "$version_id" ] && version_id=$version
 	# blocks, follows など、関連に関わる要素
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPDIR/body
 	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPDIR/note
@@ -95,14 +95,15 @@ __update_ticket() {
 	if [ "$estimate" ] ; then
 		json_add_int $outjson .issue.estimated_hours $estimate || return 1
 	fi
-	if [ "$due_date" ] ; then # && [ "$due_date" != "null" ] ; then
-		local date_text="$(date -d "$due_date" +%Y-%m-%d)"
-		json_add_text $outjson .issue.due_date "$date_text" || return 1
-	fi
+	# (2019/10/25 08:22) TODO 修正まで触らない
+	# if [ "$due_date" ] ; then # && [ "$due_date" != "null" ] ; then
+	# 	local date_text="$(date -d "$due_date" +%Y-%m-%d)"
+	# 	json_add_text $outjson .issue.due_date "$date_text" || return 1
+	# fi
 	# category
-	if [ "$version_id" ] ; then
-		json_add_int $outjson .issue.fixed_version_id $version_id || return 1
-	fi
+	# if [ "$version_id" ] ; then
+	# 	json_add_int $outjson .issue.fixed_version_id $version_id || return 1
+	# fi
 	# TODO: check '"' is escaped properly
 	if [ -e "$TMPDIR/body" ] ; then
 		json_add_text $outjson .issue.description "$(cat $TMPDIR//body)" || return 1
@@ -229,10 +230,11 @@ __format_to_draft() {
 		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $tmpfile
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
-	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
+	# (2019/10/25 08:21) TODO なんか壊れているので修正されるまで触らないことにする。
+	# echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
-	echo "#+Format: $RM_FORMAT" >> $tmpfile
+	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
+	# echo "#+Format: $RM_FORMAT" >> $tmpfile
 	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
 		while read line ; do
 			# TODO: relation の markdown への翻訳がなにかおかしい
@@ -568,10 +570,10 @@ convert_to_draft_from_json() {
 		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $draft
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $draft
-	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $draft
+	# echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $draft
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $draft
-	echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $draft
-	echo "#+Format: $RM_FORMAT" >> $draft
+	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $draft
+	# echo "#+Format: $RM_FORMAT" >> $draft
 
 	local ifs="$IFS"
 	IFS=$'\n'
@@ -728,9 +730,9 @@ generate_issue_template2() {
 	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
-	echo "#+DueDate: null" >> $tmpfile
+	# echo "#+DueDate: null" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
-	echo "#+Version: null" >> $tmpfile
+	# echo "#+Version: null" >> $tmpfile
 	echo "#+Blocks: " >> $tmpfile
 	echo "#+Precedes: " >> $tmpfile
 	echo "#+Follows: " >> $tmpfile
