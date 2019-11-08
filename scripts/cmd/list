@@ -110,15 +110,20 @@ show_project_task_list() {
 
 show_global_task_list() {
 	local pjid="$@"
+	local pj
+	for pj in $pjid ; do
+		jq "[.issues[] | select(.project.id == $pj)]" $RM_CONFIG/issues.json >> $TMPDIR/filtered.json.$pj
+	done
+	jq -s '[.[][]]' $TMPDIR/filtered.json.* > $TMPDIR/filtered.json
 
 	local ifs="$IFS"
 	IFS=$'\t'
 	if [ "$RM_SHOW_CLOSED" = "true" ] ; then
-		jq -r -c ".issues[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+		jq -r -c ".[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $TMPDIR/filtered.json | sort -k2 | while read id update project tracker status subject ; do
 			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
 		done
 	else
-		jq -r -c ".issues[] | select(.closed_on == null) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
+		jq -r -c ".[] | select(.closed_on == null) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $TMPDIR/filtered.json | sort -k2 | while read id update project tracker status subject ; do
 			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
 		done
 	fi
@@ -148,7 +153,6 @@ if [ "$GROUPING" = true ] ; then
 	done
 	cat $TMPDIR/out | expand
 else
-	# TODO: filter with given projects
 	show_global_task_list $PROJECT > $TMPDIR/out
 	cat $TMPDIR/out | column -t -s $'\t'
 fi

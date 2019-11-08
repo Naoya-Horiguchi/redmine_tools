@@ -10,8 +10,8 @@
 #
 # Options
 #   -e            edit project tree
-#   -c            show closed tickets
-#   -C            hide closed tickets
+#   -c            show all closed tickets
+#   -C            hide all closed tickets
 #   -p            show project tree
 #   -t ticket_id  show subtree under the given ticket
 #   -h            show this message
@@ -71,16 +71,31 @@ DATA=$RM_CONFIG/issues.json
 show_task_subtree() {
 	local taskid=$1
 	local depth=$2
+	local parent_closed=$3
+	local closed=
 	local childid=
 
+	[ ! "$parent_closed" ] && parent_closed=true
+	if status_closed "${STATUS_TABLE[$taskid]}" ; then
+		closed=true
+	else
+		closed=false
+	fi
+
 	if [ "$RM_SHOW_CLOSED" = "false" ] ; then
-		if status_closed "${STATUS_TABLE[$taskid]}" ; then
+		if [ "$closed" == true ] ; then
+			return 0
+		fi
+	elif [ ! "$RM_SHOW_CLOSED" ] ; then
+		# by default a closed ticket is visible if it's parent ticket is open.
+		if [ "$closed" == true ] && [ "$parent_closed" == true ] ; then
 			return 0
 		fi
 	fi
+
 	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_meta_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
 	for childid in ${SUBTASK_TABLE[$taskid]} ; do
-		show_task_subtree $childid $[depth+1]
+		show_task_subtree $childid $[depth+1] $closed
 	done
 }
 
