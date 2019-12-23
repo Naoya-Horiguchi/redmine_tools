@@ -14,6 +14,7 @@
 #   -C            hide all closed tickets
 #   -p            show project tree
 #   -t ticket_id  show subtree under the given ticket
+#   -s            show subprojects
 #   -h            show this message
 #
 # TODO:
@@ -27,6 +28,7 @@ show_help() {
 PROJECT=all
 EDIT=
 PJTREE_ONLY=
+SHOW_SUBPROJECT=
 TICKET_SUBTREE=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -45,6 +47,11 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		-p)
 			PJTREE_ONLY=true
+			SHOW_SUBPROJECT=true
+			shift 1
+			;;
+		-s)
+			SHOW_SUBPROJECT=true
 			shift 1
 			;;
 		-t)
@@ -61,6 +68,11 @@ while [[ $# -gt 0 ]] ; do
 			;;
 	esac
 done
+
+if [ "$SHOW_SUBPROJECT" ] && [ "$TICKET_SUBTREE" ] ; then
+	echo "Don't specify -s and -t together." >&2
+	exit 1
+fi
 
 # only colors for terminal output
 [ ! "$EDIT" ] && [ -t 1 ] && . $THISDIR/color.sh
@@ -431,6 +443,11 @@ if [ "$TICKET_SUBTREE" ] ; then
 	PROJECT= # get project id
 
 	show_ticket_subtree $TICKET_SUBTREE > $TMPDIR/out
+elif [ ! "$SHOW_SUBPROJECT" ] ; then
+	for pjspec in $PROJECT ; do
+		pjid=$(pjspec_to_pjid $pjspec) || exit 1
+		show_project_tree $pjid >> $TMPDIR/out
+	done
 else
 	get_project_table $RM_CONFIG/projects.json
 
