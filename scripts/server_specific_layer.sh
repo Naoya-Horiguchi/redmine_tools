@@ -39,9 +39,12 @@ pjspec_to_pjid() {
 		if [[ "$spec" =~ $re ]] ; then # if number, it's pjid itself.
 			out="$out $spec"
 		else
-			# TODO: if found multiple record? -> first match
 			# TODO: escape input? what if pjspec contains ','?
-			out="$out $(jq -r ".projects[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/projects.json)"
+			out="$out $(jq -r ".projects[] | select(.name|test(\"^$spec$\";\"i\")) | .id" $RM_CONFIG/projects.json)"
+			# 完全一致するプロジェクトが存在しないときは部分一致でマッチする。複数ヒットすることがある。
+			if [ "$out" == " " ] ; then
+				out="$out $(jq -r ".projects[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/projects.json)"
+			fi
 		fi
 	done
 	echo $out

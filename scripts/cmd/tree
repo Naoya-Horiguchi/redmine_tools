@@ -445,8 +445,9 @@ if [ "$TICKET_SUBTREE" ] ; then
 	show_ticket_subtree $TICKET_SUBTREE > $TMPDIR/out
 elif [ ! "$SHOW_SUBPROJECT" ] ; then
 	for pjspec in $PROJECT ; do
-		pjid=$(pjspec_to_pjid $pjspec) || exit 1
-		show_project_tree $pjid >> $TMPDIR/out
+		for pjid in $(pjspec_to_pjid $pjspec) ; do
+			show_project_tree $pjid >> $TMPDIR/out
+		done
 	done
 else
 	get_project_table $RM_CONFIG/projects.json
