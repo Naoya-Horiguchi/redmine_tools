@@ -58,8 +58,9 @@
 #   - implement "report" command to construct report from given set of ticket
 #
 
-mkdir -p /tmp/redmine_cli
-TMPDIR=$(mktemp -d /tmp/redmine_cli/tmp.XXXXXX)
+TSTAMP=$(date +%y%m%d_%H%M%S)
+TMPDIR=/tmp/redmine_cli/$TSTAMP
+mkdir -p /tmp/redmine_cli/$TSTAMP
 echo "redmine $*" > $TMPDIR/cmd
 
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
