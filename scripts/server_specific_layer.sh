@@ -21,6 +21,17 @@ trackerspec_to_trackerid() {
 	fi
 }
 
+categoryspec_to_categoryid() {
+	local spec="$1"
+	local re='^[0-9]+$'
+
+	if [[ "$spec" =~ $re ]] ; then
+		echo "$spec"
+	else
+		jq -r ". | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/issue_categories.json
+	fi
+}
+
 project_to_id() {
 	jq -r ".projects[] | select(.name == \"$1\") | .id" $RM_CONFIG/projects.json
 }
