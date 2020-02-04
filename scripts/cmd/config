@@ -46,9 +46,16 @@ show_versions() {
 	jq -r ".versions[] | [.id, .project.name, .name] | @tsv" $RM_CONFIG/versions/1.json | sort -k1n | column -t -s $'\t'
 }
 
+get_category_list() {
+	# jq -r "[.issues[] | select(.category) | .category] | unique_by(.id)" $RM_CONFIG/issues.json > $RM_CONFIG/categories.json
+	find $RM_CONFIG/projects/ -name "*.json" | xargs cat | jq '.project.issue_categories[] | select(length > 0)' > $RM_CONFIG/issue_categories.json
+}
+
 update_config() {
+	mkdir -p $RM_CONFIG/projects
 	__curl "/projects.json" $RM_CONFIG/projects.json "limit=100"
 	for id in $(jq -r ".projects[].id" $RM_CONFIG/projects.json) ; do
+		__curl "/projects/${id}.json" "$RM_CONFIG/projects/${id}.json" "limit=100&include=trackers,issue_categories"
 		__curl "/projects/$id/versions.json" "$RM_CONFIG/versions/${id}.json" "limit=100"
 	done
 
@@ -59,6 +66,8 @@ update_config() {
 	__curl "/users.json" "$RM_CONFIG/users.json" "limit=100"
 
 	__curl "/issue_statuses.json" "$RM_CONFIG/issue_statuses.json" "limit=100"
+
+	get_category_list
 }
 
 while [[ $# -gt 0 ]] ; do
@@ -79,7 +88,7 @@ while [[ $# -gt 0 ]] ; do
 done
 
 # TODO: support pagination (当面は 1 ページ以内に収まる)
-# TODO: ondemand update (リスト表示のとき、内部処理でID 参照が見つからないときの延長で curl する)
+# TODO: ondemand update (リスト表示のとき、内部処理で ID 参照が見つからないときの延長で curl する)
 
 type=$1
 
