@@ -54,8 +54,10 @@ tmpfile=$TMPDIR/tmp.show.txt
 __curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
 convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $TMPDIR/tmp.show.txt
 
-cat $tmpfile
 if [ "$SHOW_JOURNALS" ] ; then
-	echo
-	jq -r '.journals[] | select(.notes != "") | "===> \(.user.name) on \(.created_on)\n\(.notes)"' $tmpjson
+	echo >> $tmpfile
+	jq -r '.journals[] | select(.notes != "") | "===> \(.user.name) on \(.created_on)\n\(.notes)"' $tmpjson >> $tmpfile
 fi
+
+# TODO: use cat if the standard output is connected to pipe
+less $tmpfile
