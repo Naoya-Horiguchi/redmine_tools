@@ -238,37 +238,8 @@ __format_to_draft() {
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# (2019/10/25 08:21) TODO なんか壊れているので修正されるまで触らないことにする。
 	# echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
-	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	# echo "#+Format: $RM_FORMAT" >> $tmpfile
-	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
-		while read line ; do
-			# TODO: relation の markdown への翻訳がなにかおかしい
-			local type=$(echo $line | cut -f2 -d,)
-			if [ "$type" == "blocks" ] ; then
-				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
-			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
-			elif [ "$type" == "relates" ] ; then
-				local relates_to=$(echo $line | cut -f3 -d,)
-				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
-				else
-					echo "#+Relates: $(echo $line | cut -f1 -d,)" >> $tmpfile
-				fi
-			elif [ "$type" == "duplicates" ] ; then
-				local targetid=$(echo $line | cut -f3 -d,)
-				if [ "$targetid" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Duplicates: $targetid" >> $tmpfile
-				else
-					echo "#+Duplicates: $(echo $line | cut -f1 -d,)" >> $tmpfile
-				fi
-			else
-				echo "unsupported type $type" >&2
-				exit 1
-			fi
-		done<$relcsv
-	fi
 	if [ "$(jq -r .description $tmpjson)" != null ] ; then
 		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
 	fi
@@ -741,10 +712,6 @@ generate_issue_template2() {
 	# echo "#+DueDate: null" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
 	# echo "#+Version: null" >> $tmpfile
-	echo "#+Blocks: " >> $tmpfile
-	echo "#+Precedes: " >> $tmpfile
-	echo "#+Follows: " >> $tmpfile
-	echo "#+Relates: " >> $tmpfile
 	echo "" >> $tmpfile
 
 	cat $tmpfile

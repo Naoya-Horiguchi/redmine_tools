@@ -105,7 +105,7 @@ show_task_subtree() {
 		fi
 	fi
 
-	printf "%$[depth*2]s%-4s %s%s%s\n" "" "$taskid" "$(get_meta_part $taskid)" "$(get_relation_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
+	printf "%$[depth*2]s%-4s %s%s\n" "" "$taskid" "$(get_meta_part $taskid)" "${SUBJECT_TABLE[$taskid]}"
 	for childid in ${SUBTASK_TABLE[$taskid]} ; do
 		show_task_subtree $childid $[depth+1] $closed
 	done
