@@ -35,6 +35,8 @@ __update_ticket() {
 	local project_id="$(pjspec_to_pjid "$project")"
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
 	local tracker_id="$(trackerspec_to_trackerid "$tracker")"
+	local category="$(grep -i ^#\+category: $file | sed 's|^#+category: *||i')"
+	local category_id="$(categoryspec_to_categoryid "$category")"
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
 	local status_id="$(statusspec_to_statusid "$status")"
 	local priority="$(grep -i ^#\+priority: $file | sed 's|^#+priority: *||i')"
@@ -76,6 +78,9 @@ __update_ticket() {
 	fi
 	if [ "$tracker_id" ] ; then
 		json_add_int $outjson .issue.tracker_id $tracker_id || return 1
+	fi
+	if [ "$category_id" ] ; then
+		json_add_int $outjson .issue.category_id $category_id || return 1
 	fi
 	if [ "$status_id" ] ; then
 		json_add_int $outjson .issue.status_id $status_id || return 1
@@ -198,7 +203,6 @@ fetch_issue() {
 	local issueid="$1"
 	local relcsv="$2"
 	local tmpjson="$3"
-	local tmpf=$RM_CONFIG/tmp.tmp
 
 	if [ "$relcsv" ] ; then
 		__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
@@ -206,8 +210,8 @@ fetch_issue() {
 	fi
 
 	if [ "$tmpjson" ] ; then
-		__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
-		jq -r .issue /tmp/37 > $tmpjson
+		__curl "/issues/${issueid}.json" $TMPDIR/tmp.37 "include=journals" || return 1
+		jq -r .issue $TMPDIR/tmp.37 > $tmpjson
 	fi
 }
 
@@ -224,6 +228,7 @@ __format_to_draft() {
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
+	echo "#+Category: $(jq -r .category.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
 	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
 	if [ "$RM_USERLIST" ] ; then
@@ -232,37 +237,8 @@ __format_to_draft() {
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# (2019/10/25 08:21) TODO なんか壊れているので修正されるまで触らないことにする。
 	# echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
-	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	# echo "#+Format: $RM_FORMAT" >> $tmpfile
-	if [ "$relcsv" ] && [ -s "$relcsv" ] ; then
-		while read line ; do
-			# TODO: relation の markdown への翻訳がなにかおかしい
-			local type=$(echo $line | cut -f2 -d,)
-			if [ "$type" == "blocks" ] ; then
-				echo "#+Blocks: $(echo $line | cut -f3 -d,)" >> $tmpfile
-			elif [ "$type" == "precedes" ] ; then
-				echo "#+Precedes: $(echo $line | cut -f1 -d,)" >> $tmpfile
-			elif [ "$type" == "relates" ] ; then
-				local relates_to=$(echo $line | cut -f3 -d,)
-				if [ "$relates_to" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Relates: $(echo $line | cut -f3 -d,)" >> $tmpfile
-				else
-					echo "#+Relates: $(echo $line | cut -f1 -d,)" >> $tmpfile
-				fi
-			elif [ "$type" == "duplicates" ] ; then
-				local targetid=$(echo $line | cut -f3 -d,)
-				if [ "$targetid" -ne "$(jq -r .id $tmpjson)" ] ; then
-					echo "#+Duplicates: $targetid" >> $tmpfile
-				else
-					echo "#+Duplicates: $(echo $line | cut -f1 -d,)" >> $tmpfile
-				fi
-			else
-				echo "unsupported type $type" >&2
-				exit 1
-			fi
-		done<$relcsv
-	fi
 	if [ "$(jq -r .description $tmpjson)" != null ] ; then
 		jq -r .description $tmpjson | sed "s/\r//g" >> $tmpfile
 	fi
@@ -564,6 +540,7 @@ convert_to_draft_from_json() {
 	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $draft
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $draft
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $draft
+	echo "#+Category: $(jq -r .category.name $tmpjson)" >> $draft
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $draft
 	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $draft
 	if [ "$RM_USERLIST" ] ; then
@@ -722,6 +699,7 @@ generate_issue_template2() {
 	echo "#+Subject: subject" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
 	echo "#+Tracker: Epic" >> $tmpfile
+	echo "#+Category: null" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
 	echo "#+ParentIssue: null" >> $tmpfile
@@ -733,10 +711,6 @@ generate_issue_template2() {
 	# echo "#+DueDate: null" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
 	# echo "#+Version: null" >> $tmpfile
-	echo "#+Blocks: " >> $tmpfile
-	echo "#+Precedes: " >> $tmpfile
-	echo "#+Follows: " >> $tmpfile
-	echo "#+Relates: " >> $tmpfile
 	echo "" >> $tmpfile
 
 	cat $tmpfile

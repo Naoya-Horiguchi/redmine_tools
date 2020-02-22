@@ -1,0 +1,162 @@
+#!/bin/bash
+#
+# Usage
+#   redmine wiki [options] pjspec [wikiname]
+#
+# Description
+#
+# Options
+#   -l            list wiki pages under the project
+#   -u file       upload file
+#   -d            debug
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+LIST=
+UPLOADFILE=
+DEBUG=
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-l)
+			LIST=true
+			shift 1
+			;;
+		-u)
+			UPLOADFILE="$2"
+			shift 2
+			;;
+		-d)
+			DEBUG=true
+			shift 1
+			;;
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			# echo "invalid option $key"
+			break
+			;;
+	esac
+done
+
+[ -t 1 ] && . $THISDIR/color.sh
+[ "$#" -eq 0 ] && echo "no argument given" && show_help && exit 0
+
+PROJECT="$1"
+shift 1
+[ ! "$WIKIPAGE" ] && WIKIPAGE=Wiki # default wiki page
+WIKIPAGE="$(python -c "import urllib;print urllib.quote(raw_input())" <<< "$@")"
+
+pjid_to_pjidentifier() {
+	jq -r ".projects[] | select(.id == $1) | .identifier" $RM_CONFIG/projects.json
+}
+
+update_wiki_page() {
+	local pjidentifier="$1"
+	local wikipage="$2"
+	local extension=
+
+	if [ "$RM_FORMAT" == markdown ] ; then
+		extension=.md
+	fi
+
+	curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
+	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text
+	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text.updated${extension}
+	jq -r .wiki_page.updated_on $TMPDIR/wiki.json > $TMPDIR/wiki.updated_on
+	while true ; do
+		$EDITOR $TMPDIR/wiki.text.updated${extension}
+		diff -u $TMPDIR/wiki.text $TMPDIR/wiki.text.updated${extension} > $TMPDIR/wiki.text.diff
+		if [ -s "$TMPDIR/wiki.text.diff" ] ; then
+			cat "$TMPDIR/wiki.text.diff"
+			# ask
+			echo
+			echo "You really upload this change? (y: yes, n: no, e: edit again)"
+			read input
+			if [ "$input" == y ] || [ "$input" == Y ] ; then
+				curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.conflictcheck.json || exit 1
+				jq -r .wiki_page.updated_on $TMPDIR/wiki.conflictcheck.json > $TMPDIR/wiki.updated_on.conflictcheck
+				if diff -q $TMPDIR/wiki.updated_on $TMPDIR/wiki.updated_on.conflictcheck ; then
+					echo "ok, upload now"
+					
+					uploadjson=$TMPDIR/wiki.upload.json
+					echo "{\"wiki_page\": {}}" > $uploadjson
+					json_add_text $uploadjson .wiki_page.text "$(cat $TMPDIR/wiki.text.updated${extension})" || return 1
+					curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X PUT --data-binary "@${uploadjson}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json || return 1
+				else
+					echo "conflict detected, please try again with $TMPDIR/wiki.text.diff"
+				fi
+				break
+			elif [ "$input" == n ] || [ "$input" == N ] ; then
+				break
+			else
+				true # edit again
+			fi
+		else
+			echo no update
+			break
+		fi
+	done
+}
+
+if [ "$DEBUG" ] ; then
+	for pjspec in $PROJECT ; do
+		for pjid in $(pjspec_to_pjid $pjspec) ; do
+			pjidstr=$(pjid_to_pjidentifier $pjid)
+			# update_wiki_page $pjidstr $WIKIPAGE
+			curl -sk $RM_BASEURL/projects/${pjidstr}/wiki/${WIKIPAGE}.json?key=${RM_KEY} | jq -r .
+			break # use only first one
+		done
+		break # use only first one
+	done
+	exit 0
+fi
+
+for pjspec in $PROJECT ; do
+	for pjid in $(pjspec_to_pjid $pjspec) ; do
+		pjidstr=$(pjid_to_pjidentifier $pjid)
+		curl -sk $RM_BASEURL/projects/$pjidstr/wiki/index.json?key=${RM_KEY} > $TMPDIR/wikilist
+		# update_wiki_page $pjidstr $WIKIPAGE
+		break # use only first one
+	done
+	break # use only first one
+done
+
+if [ "$LIST" ] ; then
+	echo -e "UpdatedOn\tWikiPage" > $TMPDIR/wikilist.tsv
+	jq -r '.wiki_pages[] | [.updated_on, .title] | @tsv' $TMPDIR/wikilist >> $TMPDIR/wikilist.tsv
+	# tin=$(date -d 2020-01-17T00:13:39Z +%y%m%d_%H%M 2> /dev/null)
+	expand -t 25 $TMPDIR/wikilist.tsv
+
+	exit 0
+fi
+
+if [ "$UPLOADFILE" ] ; then
+	curl ${INSECURE:+-k} -s -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/projects/25/files.json?filename=$UPLOADFILE || return 1
+	echo ""
+	exit 0
+fi
+
+# canonicalize wikipage name
+out="$out $(jq -r ".wiki_pages[] | select(.title|test(\"^${WIKIPAGE}$\";\"i\")) | .title" $TMPDIR/wikilist)"
+# 完全一致するプロジェクトが存在しないときは部分一致でマッチする。複数ヒットすることがある。
+if [ "$out" == " " ] ; then
+	out="$out $(jq -r ".wiki_pages[] | select(.title|test(\"${WIKIPAGE}\";\"i\")) | .title" $TMPDIR/wikilist)"
+fi
+WIKIPAGE=$out
+
+# TODO: need only exact matching flag
+for pjspec in $PROJECT ; do
+	for pjid in $(pjspec_to_pjid $pjspec) ; do
+		pjidstr=$(pjid_to_pjidentifier $pjid)
+		update_wiki_page $pjidstr $WIKIPAGE
+		break # use only first one
+	done
+	break # use only first one
+done
