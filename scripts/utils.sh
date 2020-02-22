@@ -203,7 +203,6 @@ fetch_issue() {
 	local issueid="$1"
 	local relcsv="$2"
 	local tmpjson="$3"
-	local tmpf=$RM_CONFIG/tmp.tmp
 
 	if [ "$relcsv" ] ; then
 		__curl "/issues/$issueid/relations.json" /tmp/32 || return 1
@@ -211,8 +210,8 @@ fetch_issue() {
 	fi
 
 	if [ "$tmpjson" ] ; then
-		__curl "/issues/${issueid}.json" /tmp/37 "include=journals" || return 1
-		jq -r .issue /tmp/37 > $tmpjson
+		__curl "/issues/${issueid}.json" $TMPDIR/tmp.37 "include=journals" || return 1
+		jq -r .issue $TMPDIR/tmp.37 > $tmpjson
 	fi
 }
 
