@@ -60,8 +60,8 @@ __update_ticket() {
 	# fi
 	# [ ! "$version_id" ] && version_id=$version
 	# blocks, follows など、関連に関わる要素
-	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' > $TMPDIR/body
-	grep -v "^#+" $file | awk '/^### NOTE ###/{p=1;next}{if(p){print}}' > $TMPDIR/note
+	grep -v "^#+" $file | awk '/^@@@ NOTE @@@/{p=1;next}{if(!p){print}}' > $TMPDIR/body
+	grep -v "^#+" $file | awk '/^@@@ NOTE @@@/{p=1;next}{if(p){print}}' > $TMPDIR/note
 
     # is_private
     # category_id
@@ -643,7 +643,7 @@ update_issue3() {
 
 	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
 	convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
-	echo "### NOTE ### LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
+	echo "@@@ NOTE @@@ LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
 	cp $draft ${draft}.before_edit
 
 	__open_clock $issueid
@@ -669,7 +669,7 @@ update_issue3() {
 			read input
 		else
 			convert_to_draft_from_json $issueid $TMPDIR/tmp.after_edit ${draft}.after_edit
-			awk '/^### NOTE ###/{p=1;next}{if(!p){print}}' ${draft}.before_edit > ${draft}.before_edit2
+			awk '/^@@@ NOTE @@@/{p=1;next}{if(!p){print}}' ${draft}.before_edit > ${draft}.before_edit2
 			diff -u ${draft}.before_edit2 ${draft}.after_edit > $TMPDIR/tmp.draft.conflict
 			if [ -s "$TMPDIR/tmp.draft.conflict" ] ; then
 				echo "### CONFLICT ### YOU NEED TO CONFLICET THE BELOW DIFF MANUALLY" >> $draft

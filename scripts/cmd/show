@@ -27,6 +27,10 @@ while [[ $# -gt 0 ]] ; do
 			SHOW_JOURNALS=true
 			shift
 			;;
+		-t|--tree)
+			SHOW_TREE=true
+			shift
+			;;
 		-h)
 			show_help
 			exit 0
@@ -56,32 +60,27 @@ tmpfile=$TMPDIR/tmp.show.txt
 __curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
 convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $TMPDIR/tmp.show.txt
 
+. $THISDIR/tree.sh
+DATA=$RM_CONFIG/issues.json
+
 if [ "$SHOW_JOURNALS" ] ; then
-	fetch_issue $ISSUEID "" $TMPDIR/issue_journal.json
+	show_ticket_journal $ISSUEID
+	cat $TMPDIR/$ISSUEID/abcd | less -R
+elif [ "$SHOW_TREE" ] ; then
+	PROJECT=
+	show_ticket_subtree $ISSUEID > $TMPDIR/out
 
-	jq -r ".journals[].id" $TMPDIR/issue_journal.json | tac > $TMPDIR/journal_ids
-	for jid in $(cat $TMPDIR/journal_ids) ; do
-		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .old_value" $TMPDIR/issue_journal.json > $TMPDIR/journal_${jid}.1
-		if [ ! -s "$TMPDIR/journal_${jid}.1" ] ; then
-			continue
-		fi
-		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .new_value" $TMPDIR/issue_journal.json > $TMPDIR/journal_${jid}.2
-		# TODO: ステータスの変更を表示させる
-		printf "${CL_YELLOW}journal ID: ${jid}${CL_NC}\n" >> $TMPDIR/abcd
-		journal_date=$(jq -r ".journals[] | select(.id == $jid) | .created_on" $TMPDIR/issue_journal.json)
-		echo "Date: $(date -d $journal_date)" >> $TMPDIR/abcd
-		echo "" >> $TMPDIR/abcd
-		journal_note=$(jq -r ".journals[] | select(.id == $jid) | .notes" $TMPDIR/issue_journal.json)
-
-		if [ "$journal_note" ] ; then
-			echo "$journal_note" | sed 's/^/    /' >> $TMPDIR/abcd
-			echo "" >> $TMPDIR/abcd
-		fi
-		git -c core.whitespace=cr-at-eol diff --color $TMPDIR/journal_${jid}.1 $TMPDIR/journal_${jid}.2 | tail +5 >> $TMPDIR/abcd
+	ifs="$IFS"
+	IFS=$'\n'
+	for line in $(cat $TMPDIR/out) ; do
+		[[ "$line" =~ ^PJ ]] && continue
+		tid=$(echo $line | awk '{print $1}')
+		count=$(echo $line | perl -pe 's/^( *).*?$/\1/' | wc -c)
+		show_ticket_tree $tid $[count / 2] >> $TMPDIR/index.md
 	done
-	cat $TMPDIR/abcd | less -R
-	exit 0
+	IFS="$ifs"
+	cat $TMPDIR/index.md | less -R
+else
+	# TODO: use cat if the standard output is connected to pipe
+	less $tmpfile
 fi
-
-# TODO: use cat if the standard output is connected to pipe
-less $tmpfile
