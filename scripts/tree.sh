@@ -346,7 +346,7 @@ show_ticket_tree() {
 
 	local abc=$(eval printf "%.0s#" {1..${indent}})
 	jq -r ".subject" $tidtmp/issue_journal.json | sed "s/^/${abc} /"
-	jq -r ".description" $tidtmp/issue_journal.json | sed "s/^\(#\+ \)/${abc}\1/" > $tidtmp/desc
+	jq -r ".description" $tidtmp/issue_journal.json | sed "s/\r//g" | sed "s/^\(#\+ \)/${abc}\1/" > $tidtmp/desc
 	if [ "$(cat $tidtmp/desc)" != "null" ] ; then
 		cat $tidtmp/desc
 	fi

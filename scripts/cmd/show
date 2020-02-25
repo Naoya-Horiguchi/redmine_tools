@@ -6,8 +6,10 @@
 # Description
 #
 # Options
-#   -j|--journal  display notes
-#   -h            show this message
+#   -j|--journal                display notes
+#   -t|--tree                   show ticket subtree in markdown
+#   -T|--tree-from-file <file>  show ticket subtree from file
+#   -h                          show this message
 #
 
 # TODO: support local ticket
@@ -29,7 +31,13 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		-t|--tree)
 			SHOW_TREE=true
+			[ "$RM_FORMAT" != markdown ] && echo "only RM_FORMAT=markdown is supported" && exit 1
 			shift
+			;;
+		-T|--tree-from-file)
+			SHOW_TREE_FROM_FILE=$2
+			[ "$RM_FORMAT" != markdown ] && echo "only RM_FORMAT=markdown is supported" && exit 1
+			shift 2
 			;;
 		-h)
 			show_help
@@ -40,6 +48,26 @@ while [[ $# -gt 0 ]] ; do
 			;;
 	esac
 done
+
+. $THISDIR/tree.sh
+DATA=$RM_CONFIG/issues.json
+
+if [ -e "$SHOW_TREE_FROM_FILE" ] ; then
+	ifs="$IFS"
+	IFS=$'\n'
+	for line in $(cat $SHOW_TREE_FROM_FILE) ; do
+		[[ "$line" =~ ^PJ ]] && continue
+		tid=$(echo $line | awk '{print $1}')
+		count=$(echo $line | perl -pe 's/^( *).*?$/\1/' | wc -c)
+		show_ticket_tree $tid $[count / 2] >> $TMPDIR/index.md
+	done
+	IFS="$ifs"
+	cat $TMPDIR/index.md | less -R
+	if md-to-pdf -v > /dev/null ; then
+		md-to-pdf $TMPDIR/index.md ./output.pdf
+	fi
+	exit 0
+fi
 
 ISSUEID=$1
 
@@ -60,9 +88,6 @@ tmpfile=$TMPDIR/tmp.show.txt
 __curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
 convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $TMPDIR/tmp.show.txt
 
-. $THISDIR/tree.sh
-DATA=$RM_CONFIG/issues.json
-
 if [ "$SHOW_JOURNALS" ] ; then
 	show_ticket_journal $ISSUEID
 	cat $TMPDIR/$ISSUEID/abcd | less -R
@@ -80,6 +105,9 @@ elif [ "$SHOW_TREE" ] ; then
 	done
 	IFS="$ifs"
 	cat $TMPDIR/index.md | less -R
+	if md-to-pdf -v > /dev/null ; then
+		md-to-pdf $TMPDIR/index.md ./output.pdf
+	fi
 else
 	# TODO: use cat if the standard output is connected to pipe
 	less $tmpfile
