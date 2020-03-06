@@ -317,16 +317,21 @@ show_ticket_journal() {
 	jq -r ".journals[].id" $tidtmp/issue_journal.json | tac > $tidtmp/journal_ids
 	for jid in $(cat $tidtmp/journal_ids) ; do
 		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .old_value" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.1
-		if [ ! -s "$tidtmp/journal_${jid}.1" ] ; then
+		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .new_value" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.2
+		journal_note=$(jq -r ".journals[] | select(.id == $jid) | .notes" $tidtmp/issue_journal.json)
+
+		if [ ! -s "$tidtmp/journal_${jid}.1" ] && [ ! "$journal_note" ] ; then
 			continue
 		fi
-		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .new_value" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.2
+
 		# TODO: ステータスの変更を表示させる
 		printf "${CL_YELLOW}journal ID: ${jid}${CL_NC}\n" >> $tidtmp/abcd
 		journal_date=$(jq -r ".journals[] | select(.id == $jid) | .created_on" $tidtmp/issue_journal.json)
+		user_name=$(jq -r ".journals[] | select(.id == $jid) | .user.name" $tidtmp/issue_journal.json)
+		echo "Author: $user_name" >> $tidtmp/abcd
 		echo "Date: $(date -d $journal_date)" >> $tidtmp/abcd
+
 		echo "" >> $tidtmp/abcd
-		journal_note=$(jq -r ".journals[] | select(.id == $jid) | .notes" $tidtmp/issue_journal.json)
 
 		if [ "$journal_note" ] ; then
 			echo "$journal_note" | sed 's/^/    /' >> $tidtmp/abcd

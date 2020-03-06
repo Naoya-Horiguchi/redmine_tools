@@ -698,7 +698,7 @@ generate_issue_template2() {
 	echo "#+Project: " >> $tmpfile
 	echo "#+Subject: subject" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
-	echo "#+Tracker: Epic" >> $tmpfile
+	echo "#+Tracker: " >> $tmpfile
 	echo "#+Category: null" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
