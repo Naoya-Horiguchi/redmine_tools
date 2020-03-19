@@ -44,7 +44,7 @@ __update_ticket() {
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
 	# TODO: ユーザリストがない場合の対応
-	
+
 	if [ ! -s "$RM_CONFIG/users.json" ] ; then
 		local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
 		local assigned_id="$(userspec_to_userid "$assigned")"
@@ -689,9 +689,19 @@ update_issue3() {
 	__close_clock $issueid
 }
 
-generate_issue_template2() {
+generate_issue_template() {
 	local tmpfile=$TMPDIR/new/$RM_DRAFT_FILENAME
 	mkdir -p $(dirname $tmpfile)
+
+	if [ "$TEMPLATE" ] ; then
+		if [ -s "$TEMPLATE" ] ; then
+			cat $TEMPLATE | sed -e 's/^#+Status:.*/#+Status: New/' -e 's/^#+DoneRatio:.*/#+DoneRatio: 0/' > $tmpfile
+			return
+		else
+			echo "Template file $TEMPLATE not found"
+			exit 1
+		fi
+	fi
 
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo -n "" > $tmpfile
