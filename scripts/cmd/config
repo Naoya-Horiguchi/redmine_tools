@@ -46,6 +46,11 @@ show_versions() {
 	jq -r ".versions[] | [.id, .project.name, .name] | @tsv" $RM_CONFIG/versions/1.json | sort -k1n | column -t -s $'\t'
 }
 
+show_time_entries() {
+	update_local_cache_time_entries
+	jq -r ".time_entries[] | [.project.name, .issue.id, .user.name, .activity.name, .hours, .spent_on] | @tsv" $RM_CONFIG/time_entries.json | sort -k1n | column -t -s $'\t'
+}
+
 get_category_list() {
 	# jq -r "[.issues[] | select(.category) | .category] | unique_by(.id)" $RM_CONFIG/issues.json > $RM_CONFIG/categories.json
 	find $RM_CONFIG/projects/ -name "*.json" | xargs cat | jq '.project.issue_categories[] | select(length > 0)' > $RM_CONFIG/issue_categories.json
@@ -110,6 +115,9 @@ case "$type" in
 		;;
 	v|ve|ver|vers|versi|versio|version|versions)
 		show_versions
+		;;
+	ti|tim|time)
+		show_time_entries
 		;;
 	a|al|all)
 		echo "--- versions"
