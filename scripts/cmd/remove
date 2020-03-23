@@ -1,12 +1,15 @@
 #!/bin/bash
 #
 # Usage
-#   redmine remove <ticket_id>
+#   redmine remove [options] <ticket_id>
 #
 # Description
 #   Remove the specified ticket from Redmine server, so you have to be
 #   careful not to lose data. The data backup will be saved on server
 #   under cache directory ($RM_CONFIG/edit_memo/$ticketid).
+#
+# Options
+#   -h            show this message
 #
 # TODO:
 #  - how do we find the reomved issues on server-side (by other users)
@@ -14,6 +17,19 @@
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
 
 ISSUEID=$1
 
@@ -40,4 +56,3 @@ fi
 remove_ticket $ISSUEID || exit 1
 rmeove_ticket_from_local_cache $ISSUEID
 echo "successfully removed issue $ISSUEID, and the data is saved on $TMPD/$ISSUEID/"
-
