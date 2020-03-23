@@ -6,17 +6,23 @@
 # Description
 #
 # Options
-#   -l            create local ticket
-#   -h            show this message
+#   -t|--template <file>   create new ticket from given template file
+#   -l                     create local ticket
+#   -h                     show this message
 #
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
+TEMPLATE=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
+		-t|--template)
+			TEMPLATE=$2
+			shift 2
+			;;
 		-l)
 			LOCALTICKET=true
 			shift 1
@@ -35,5 +41,5 @@ if [ "$LOCALTICKET" ] ; then
 	NEWLOCALTID="$(generate_local_ticket_id)"
 fi
 
-generate_issue_template2 || exit 1
+generate_issue_template || exit 1
 update_new_issue

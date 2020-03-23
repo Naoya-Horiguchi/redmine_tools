@@ -10,22 +10,21 @@ redmine() {
 	# TODO: doesn't work if global option is given.
 	if [ "$subcmd" == edit ] ; then
 		local issueid=$2
-		local subject="$(jq -r ".issues[] | select(.id == $issueid) | .subject" $RM_CONFIG/issues.json)"
-		local project="$(jq -r ".issues[] | select(.id == $issueid) | .project.name" $RM_CONFIG/issues.json)"
-		[ "$issueid" -gt 0 ] && mkdir -p "$RM_CONFIG/edit_memo/$issueid"
-		if [ -e "$RM_CONFIG/edit_memo/$issueid" ] ; then
-			PROMPT_COMMAND=''
-			# [ "$subject" ] && PROMPT_COMMAND='echo -e "\033]2; RM#'$issueid $subject'\a"'
-			# [ "$subject" ] && PROMPT_COMMAND='echo -e "\033]2; -\a"'
-			# PROMPT_COMMAND='echo -en "\033]0; $("echo RM#$issueid $subject") \a"'
+		local subject="$(jq -r ".issues[] | select(.id == $issueid) | .subject" $RM_CONFIG/issues.json 2> /dev/null)"
+		local project="$(jq -r ".issues[] | select(.id == $issueid) | .project.name" $RM_CONFIG/issues.json 2> /dev/null)"
+
+		if [ "$issueid" ] && [ "$issueid" -ge 0 ] 2> /dev/null ; then
+			mkdir -p "$RM_CONFIG/edit_memo/$issueid"
 			if [ "$STY" ] ; then
-				# printf $'\033k'$(date +%y%m%d_%H%M%S)$'\033'\\
 				printf $'\033k'RM#$issueid\($project\)$'\033'\\
 			else
 				echo -en "\033]2; RM#$issueid ($project): $subject\a"
 			fi
 			cd $RM_CONFIG/edit_memo/$issueid
 			bash $thisdir/scripts/main.sh $@
+		else
+			bash $thisdir/scripts/main.sh $subcmd -h
+			return
 		fi
 	elif [ "$subcmd" == dir ] ; then
 		local issueid=$2

@@ -25,3 +25,12 @@ export RM_USERLIST=
 # options whether closed issues are shown in the output or not. RM_SHOW_CLOSED
 # decides the default behavior of it. (Default: false)
 export RM_SHOW_CLOSED=false
+
+# RM_TIME_ENTRY is set to "true", a time entry is created after successfully
+# updating a ticket. RM_TIME_ENTRY_MIN is the minimum clock (in seconds),
+# if the clock is under this value time entry is not created.
+# RM_TIME_ENTRY_MAX is the maximum clock (in seconds), if the clock is over
+# this value time entry is not created.
+export RM_TIME_ENTRY=false
+export RM_TIME_ENTRY_MIN=120
+export RM_TIME_ENTRY_MAX=$[8*60*60]

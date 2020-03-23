@@ -44,7 +44,7 @@ __update_ticket() {
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
 	# TODO: ユーザリストがない場合の対応
-	
+
 	if [ ! -s "$RM_CONFIG/users.json" ] ; then
 		local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
 		local assigned_id="$(userspec_to_userid "$assigned")"
@@ -294,6 +294,59 @@ __close_clock() {
 	trap 2
 	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+
+	local record="$(tail -n1 $TMPD/$issueid/.clock.log)"
+	local cin=$(echo $record | cut -f1 -d' ')
+	local cout=$(echo $record | cut -f2 -d' ')
+	local tin=$(date -d $cin +%s 2> /dev/null)
+	local tout=$(date -d $cout +%s 2> /dev/null)
+	local clock=$[$tout - $tin]
+
+	# TODO: error handling, activity?
+	if [ "$RM_TIME_ENTRY" == true ] ; then
+		if [ "$clock" -ge "${RM_TIME_ENTRY_MIN:=120}" ] ; then
+			if [ "$clock" -le "${RM_TIME_ENTRY_MAX:=14400}" ] ; then
+				create_time_entry "$issueid" "$(calc_clock_hour $clock)" "" "" "" > /dev/null
+			fi
+		fi
+	fi
+}
+
+calc_clock_hour() {
+	local clock="$1"
+	# round down to min
+	local time="$(echo "scale=2 ; $clock / 3600" | bc 2> /dev/null)"
+
+	# local min="$[($clock / 60) % 60]"
+	# local hour="$[$clock / 60 / 60]"
+	# printf "%d:%02d\n" $hour $min
+
+	echo $time
+}
+
+create_time_entry() {
+	local issueid="$1"
+	local clockstr="$2"
+	local spenton="$3"
+	local activity="$4"
+	local comment="$5"
+	local outjson=$TMPD/$issueid/create_time_entry.json
+
+	echo "{\"time_entry\": {}}" > $outjson
+	json_add_int $outjson .time_entry.issue_id "$issueid" || return 1
+	json_add_int $outjson .time_entry.hours "$clockstr" || return 1
+
+	if [ "$spenton" ] ; then
+		json_add_text $outjson .issue.spent_on "$spenton" || return 1
+	fi
+	if [ "$activity" ] ; then
+		json_add_int $outjson .time_entry.activity_id "$activity" || return 1
+	fi
+	if [ "$comment" ] ; then
+		json_add_text $outjson .issue.comments "$comment" || return 1
+	fi
+
+	curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X POST --data-binary "@${outjson}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/time_entries.json
 }
 
 declare -A PJTABLE;
@@ -404,6 +457,28 @@ rmeove_ticket_from_local_cache() {
 		mv $TMPDIR/tmp.issues.json $RM_CONFIG/issues.json
 		return 0
 	fi
+}
+
+RM_LAST_DOWNLOAD_TE=$RM_CONFIG/tmp.last_download_time_entry
+
+update_local_cache_time_entries() {
+	local data="${ASSIGNED_OPT}&status_id=*&include=relations&sort=updated_on:desc"
+
+	if [ -s "$RM_LAST_DOWNLOAD_TE" ] ; then
+		__curl_limit "/time_entries.json" $RM_CONFIG/tmp.time_entries.json "$data&from=$(cat $RM_LAST_DOWNLOAD_TE)" 10000 || return 1
+		jq -r ".time_entries[]" $RM_CONFIG/tmp.time_entries.json > $RM_CONFIG/tmp.new_time_entries
+		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.time_entries.json)"
+		if [ "$total_count" -gt 0 ] ; then
+			jq -r --slurpfile new_time_entries $RM_CONFIG/tmp.new_time_entries \
+			   '.time_entries |= [ . + $new_time_entries | group_by(.id)[] | add ]' $RM_CONFIG/time_entries.json > $RM_CONFIG/time_entries.json.tmp || return 1
+			mv $RM_CONFIG/time_entries.json.tmp $RM_CONFIG/time_entries.json
+		else
+			echo "local cache is up-to-date" >&2
+		fi
+	else
+		__curl_limit "/time_entries.json" $RM_CONFIG/time_entries.json "$data" 10000 || return 1
+	fi
+	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD_TE
 }
 
 declare -A SUBTASK_TABLE
@@ -689,9 +764,19 @@ update_issue3() {
 	__close_clock $issueid
 }
 
-generate_issue_template2() {
+generate_issue_template() {
 	local tmpfile=$TMPDIR/new/$RM_DRAFT_FILENAME
 	mkdir -p $(dirname $tmpfile)
+
+	if [ "$TEMPLATE" ] ; then
+		if [ -s "$TEMPLATE" ] ; then
+			cat $TEMPLATE | sed -e 's/^#+Status:.*/#+Status: New/' -e 's/^#+DoneRatio:.*/#+DoneRatio: 0/' > $tmpfile
+			return
+		else
+			echo "Template file $TEMPLATE not found"
+			exit 1
+		fi
+	fi
 
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo -n "" > $tmpfile
