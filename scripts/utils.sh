@@ -420,13 +420,14 @@ update_local_cache() {
 			jq -r --slurpfile new_items $RM_CONFIG/tmp.new_items \
 			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $RM_CONFIG/issues.json.tmp || return 1
 			mv $RM_CONFIG/issues.json.tmp $RM_CONFIG/issues.json
+			date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 		else
 			echo "local cache is up-to-date" >&2
 		fi
 	else
 		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 || return 1
+		date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 	fi
-	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 }
 
 # WIP
