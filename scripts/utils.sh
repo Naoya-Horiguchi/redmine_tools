@@ -720,6 +720,15 @@ update_issue3() {
 	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
 	convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
 	echo "@@@ NOTE @@@ LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
+
+	if [ "$REPLYNOTE" ] ; then
+		show_ticket_journal $issueid
+		jq -r ".journals[$[REPLYNOTE-1]].notes" $TMPDIR/$ISSUEID/issue_journal.json 2> /dev/null | sed 's/^/> /' > $TMPDIR/replynote
+		if [ -s "$TMPDIR/replynote" ] && [ "$(cat $TMPDIR/replynote)" != "> null" ] ; then
+			cat $TMPDIR/replynote >> $draft
+		fi
+	fi
+
 	cp $draft ${draft}.before_edit
 
 	__open_clock $issueid

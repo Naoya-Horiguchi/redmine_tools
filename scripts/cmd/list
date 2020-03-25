@@ -157,4 +157,3 @@ else
 	show_global_task_list $PROJECT > $TMPDIR/out
 	cat $TMPDIR/out | column -t -s $'\t'
 fi
-
