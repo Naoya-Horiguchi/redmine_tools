@@ -18,7 +18,7 @@ show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
-SHOW_JOURNALS=
+SHOW_JOURNALS=$RM_SHOW_JOURNALS
 RM_SHOW_CLOSED=true
 
 . $THISDIR/color.sh
@@ -87,8 +87,11 @@ update_local_cache_task $ISSUEID || exit 1
 
 if [ "$SHOW_JOURNALS" ] ; then
 	show_ticket_journal $ISSUEID
-	cat $TMPDIR/$ISSUEID/abcd | less -R
-elif [ "$SHOW_TREE" ] ; then
+	# cat $TMPDIR/$ISSUEID/abcd | less -R
+	# cat $TMPDIR/$ISSUEID/abcd
+fi
+
+if [ "$SHOW_TREE" ] ; then
 	PROJECT=
 	show_ticket_subtree $ISSUEID > $TMPDIR/out
 
@@ -110,6 +113,10 @@ else
 	__curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
 	convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $tmpfile
 
+	if [ "$SHOW_JOURNALS" ] ; then
+		echo -e "${CL_BLUE}################################ LOG ################################${CL_NC}" >> $tmpfile
+		cat $TMPDIR/$ISSUEID/abcd >> $tmpfile
+	fi
 	# TODO: use cat if the standard output is connected to pipe
-	less $tmpfile
+	cat $tmpfile | less -R
 fi

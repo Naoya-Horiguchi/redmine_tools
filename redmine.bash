@@ -9,7 +9,8 @@ redmine() {
 
 	# TODO: doesn't work if global option is given.
 	if [ "$subcmd" == edit ] ; then
-		local issueid=$2
+		local issueid=${!#}
+
 		local subject="$(jq -r ".issues[] | select(.id == $issueid) | .subject" $RM_CONFIG/issues.json 2> /dev/null)"
 		local project="$(jq -r ".issues[] | select(.id == $issueid) | .project.name" $RM_CONFIG/issues.json 2> /dev/null)"
 
