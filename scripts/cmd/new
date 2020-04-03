@@ -6,9 +6,10 @@
 # Description
 #
 # Options
-#   -t|--template <file>   create new ticket from given template file
-#   -l                     create local ticket
-#   -h                     show this message
+#   -t|--template <file>     create new ticket from given template file
+#   -t|--template <ticketID> create new ticket with template from given ticket ID
+#   -l                       create local ticket
+#   -h                       show this message
 #
 
 show_help() {
@@ -22,6 +23,10 @@ while [[ $# -gt 0 ]] ; do
 		-t|--template)
 			TEMPLATE=$2
 			shift 2
+			if [ ! -s "$TEMPLATE" ] ; then
+				RM_SHOW_JOURNALS= . $THISDIR/cmd/show "$TEMPLATE" > $TMPDIR/template || exit 1
+				TEMPLATE=$TMPDIR/template
+			fi
 			;;
 		-l)
 			LOCALTICKET=true
