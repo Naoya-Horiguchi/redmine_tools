@@ -715,7 +715,9 @@ update_issue3() {
 	local issueid="$1"
 	local draft=$TMPDIR/$RM_DRAFT_FILENAME
 
-	__check_opened $issueid || return 1
+	if [ "$RM_SAVE_CLOCK" ] ; then
+		__check_opened $issueid || return 1
+	fi
 
 	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
 	convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
@@ -731,7 +733,7 @@ update_issue3() {
 
 	cp $draft ${draft}.before_edit
 
-	__open_clock $issueid
+	[ "$RM_SAVE_CLOCK" ] && __open_clock $issueid
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
 		# symlinks for easy access
@@ -771,7 +773,7 @@ update_issue3() {
 			fi
 		fi
 	done
-	__close_clock $issueid
+	[ "$RM_SAVE_CLOCK" ] && __close_clock $issueid
 }
 
 generate_issue_template() {
