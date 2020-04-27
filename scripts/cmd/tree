@@ -165,5 +165,5 @@ fi
 if [ "$EDIT" ] ; then
 	edit_tree $TMPDIR/out
 else
-	cat $TMPDIR/out | expand
+	cat $TMPDIR/out | expand | less -R
 fi
