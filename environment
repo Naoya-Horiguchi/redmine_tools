@@ -37,3 +37,7 @@ export RM_SHOW_JOURNALS=true
 export RM_TIME_ENTRY=false
 export RM_TIME_ENTRY_MIN=120
 export RM_TIME_ENTRY_MAX=$[8*60*60]
+
+export RM_SAVE_CLOCK=false
+
+export RM_CHANGE_DIRECTORY=false

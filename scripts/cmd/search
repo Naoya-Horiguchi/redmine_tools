@@ -64,6 +64,9 @@ EOF
 # utf8=✓
 # scope=
 # open_issues=$OPEN_ISSUE
+if [ "$OPEN_ISSUE" == 1 ] ; then
+	SEARCH_STRING="${SEARCH_STRING}&open_issues=1"
+fi
 
 ORIG_IFS="$IFS"
 IFS=$'\n'
