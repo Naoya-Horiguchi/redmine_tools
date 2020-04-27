@@ -52,7 +52,7 @@ pjspec_to_pjid() {
 			# TODO: escape input? what if pjspec contains ','?
 			tmp2="$(jq -r ".projects[] | select(.name|test(\"^$tmp$\";\"i\")) | .id" $RM_CONFIG/projects.json)"
 			# 完全一致するプロジェクトが存在しないときは部分一致でマッチする。複数ヒットすることがある。
-			if [ "$tmp2" == " " ] ; then
+			if [ ! "$tmp2" ] ; then
 				tmp2="$(jq -r ".projects[] | select(.name|test(\"$tmp\";\"i\")) | .id" $RM_CONFIG/projects.json)"
 			fi
 			out="$out $tmp2"
