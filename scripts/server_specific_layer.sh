@@ -40,23 +40,24 @@ project_to_name() {
 	jq -r ".projects[] | select(.id == $1) | .name" $RM_CONFIG/projects.json
 }
 
+# TODO: duplicate input, sort
 pjspec_to_pjid() {
-	local specs="$@"
 	local re='^[0-9]+$'
-	local spec=
 	local out=
-
-	for spec in $specs ; do
-		if [[ "$spec" =~ $re ]] ; then # if number, it's pjid itself.
-			out="$out $spec"
+	for i in $(seq $#) ; do
+		tmp="$1"
+		if [[ "$tmp" =~ $re ]] ; then
+			out="$out $tmp"
 		else
 			# TODO: escape input? what if pjspec contains ','?
-			out="$out $(jq -r ".projects[] | select(.name|test(\"^$spec$\";\"i\")) | .id" $RM_CONFIG/projects.json)"
+			tmp2="$(jq -r ".projects[] | select(.name|test(\"^$tmp$\";\"i\")) | .id" $RM_CONFIG/projects.json)"
 			# 完全一致するプロジェクトが存在しないときは部分一致でマッチする。複数ヒットすることがある。
-			if [ "$out" == " " ] ; then
-				out="$out $(jq -r ".projects[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/projects.json)"
+			if [ "$tmp2" == " " ] ; then
+				tmp2="$(jq -r ".projects[] | select(.name|test(\"$tmp\";\"i\")) | .id" $RM_CONFIG/projects.json)"
 			fi
+			out="$out $tmp2"
 		fi
+		shift
 	done
 	echo $out
 }
