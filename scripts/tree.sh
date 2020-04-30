@@ -277,6 +277,7 @@ EOF
 	__create_ticket $TMPDIR/update.json $issueid > $TMPDIR/$issueid/create.result.json
 	local newissueid=$(jq -r ".issue.id" $TMPDIR/$issueid/create.result.json)
 	[ "$newissueid" == null ] && echo "failed to get new ticket ID" && return 1
+	sed -i -e "s/ $issueid/ $newissueid/" -e "s/+$issueid /+$newissueid /" $TMPDIR/pjtree.diff
 
 	echo "created new ticket $newissueid"
 	mkdir -p $RM_CONFIG/edit_memo/$newissueid
