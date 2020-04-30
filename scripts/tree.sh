@@ -141,6 +141,7 @@ update_pjtree_ticket() {
 	local metafield="$(echo "$newline" | awk -F'[><]' '{print $2}')"
 	local tracker="$(echo $metafield | cut -f1 -d\|)"
 	local status="$(echo $metafield | cut -f2 -d\|)"
+	local done_ratio="$(echo $metafield | cut -f3 -d\|)"
 	# TODO: 不完全、タイトルの先頭に () がある場合と区別できないといけない
 	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
 	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
@@ -209,6 +210,11 @@ update_pjtree_ticket() {
 }}
 EOF
 
+	if [ "$done_ratio" ] && [ "$done_ratio" != null ] ; then
+		jq ".issue.done_ratio += $done_ratio" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
+
 	local newparent="$(find_new_parent $issueid)"
 	if [ "$newparent" ] ; then
 		jq ".issue.parent_issue_id += \"$newparent\"" $TMPDIR/update.json > $TMPDIR/update.json2
@@ -271,6 +277,7 @@ EOF
 	__create_ticket $TMPDIR/update.json $issueid > $TMPDIR/$issueid/create.result.json
 	local newissueid=$(jq -r ".issue.id" $TMPDIR/$issueid/create.result.json)
 	[ "$newissueid" == null ] && echo "failed to get new ticket ID" && return 1
+	sed -i -e "s/ $issueid/ $newissueid/" -e "s/+$issueid /+$newissueid /" $TMPDIR/pjtree.diff
 
 	echo "created new ticket $newissueid"
 	mkdir -p $RM_CONFIG/edit_memo/$newissueid

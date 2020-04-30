@@ -105,6 +105,7 @@ edit_tree() {
 	diff -u $TMPDIR/out.copy $TMPDIR/out > $TMPDIR/out.diff
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out.copy | sort -k1n > $TMPDIR/pjtree.before || exit 1
 	bash $THISDIR/project_tree_parse.sh $TMPDIR/out | sort -k1n > $TMPDIR/pjtree.after || exit 1
+	# this $TMPDIR/pjtree.diff might be updated for newly created tickets
 	diff -u0 $TMPDIR/pjtree.before $TMPDIR/pjtree.after > $TMPDIR/pjtree.diff
 	# cat $TMPDIR/pjtree.diff
 
