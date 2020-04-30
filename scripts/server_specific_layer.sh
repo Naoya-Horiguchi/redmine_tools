@@ -138,4 +138,8 @@ issueid_to_pjid() {
 	jq -r ".issues[] | select(.id == $1) | .project.id" $RM_CONFIG/issues.json
 }
 
+issueid_to_done_ratio() {
+	jq -r ".issues[] | select(.id == $1) | .done_ratio" $RM_CONFIG/issues.json
+}
+
 # TODO: add some for version

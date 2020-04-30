@@ -563,6 +563,8 @@ get_status_part() {
 	if [ "${STATUS_TABLE[$taskid]}" ] ; then
 		if status_closed "${STATUS_TABLE[$taskid]}" ; then
 			printf "${CL_DGRAY}${STATUS_TABLE[$taskid]}${CL_NC}"
+		elif [ "${STATUS_TABLE[$taskid]}" == New ] ; then
+			printf "${CL_CYAN}${STATUS_TABLE[$taskid]}${CL_NC}"
 		else
 			printf "${CL_YELLOW}${STATUS_TABLE[$taskid]}${CL_NC}"
 		fi
@@ -579,9 +581,22 @@ get_relation_part() {
 	fi
 }
 
+get_done_ratio_part() {
+	local taskid=$1
+	local done_ratio="$(issueid_to_done_ratio $taskid)"
+
+	if [ "$done_ratio" -eq 100 ] ; then
+		printf "${CL_GREEN}${done_ratio}${CL_NC}"
+	elif [ "$done_ratio" -eq 0 ] ; then
+		printf "${CL_WHITE}${done_ratio}${CL_NC}"
+	else
+		printf "${CL_RED}${done_ratio}${CL_NC}"
+	fi
+}
+
 get_meta_part() {
 	# printf "<${CL_GREEN}${TRACKER_TABLE[$taskid]}|${STATUS_TABLE[$taskid]}${CL_NC}> "
-	printf "<$(get_tracker_part "$1")|$(get_status_part "$1")> "
+	printf "<$(get_tracker_part "$1")|$(get_status_part "$1")|$(get_done_ratio_part "$1")> "
 }
 
 edit_local_ticket() {

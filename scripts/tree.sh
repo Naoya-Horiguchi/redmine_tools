@@ -141,6 +141,7 @@ update_pjtree_ticket() {
 	local metafield="$(echo "$newline" | awk -F'[><]' '{print $2}')"
 	local tracker="$(echo $metafield | cut -f1 -d\|)"
 	local status="$(echo $metafield | cut -f2 -d\|)"
+	local done_ratio="$(echo $metafield | cut -f3 -d\|)"
 	# TODO: 不完全、タイトルの先頭に () がある場合と区別できないといけない
 	local newrelations="$(echo "$newline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
 	local oldrelations="$(echo "$oldline" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
@@ -208,6 +209,11 @@ update_pjtree_ticket() {
   "subject": "${subject//\"/\\\"}"
 }}
 EOF
+
+	if [ "$done_ratio" ] && [ "$done_ratio" != null ] ; then
+		jq ".issue.done_ratio += $done_ratio" $TMPDIR/update.json > $TMPDIR/update.json2
+		mv $TMPDIR/update.json2 $TMPDIR/update.json
+	fi
 
 	local newparent="$(find_new_parent $issueid)"
 	if [ "$newparent" ] ; then
