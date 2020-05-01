@@ -331,6 +331,7 @@ show_ticket_journal() {
 		jq -r ". | select(.name == \"project_id\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.pjid
 		jq -r ". | select(.name == \"status_id\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.status
 		jq -r ". | select(.name == \"done_ratio\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.done_ratio
+		jq -r ". | select(.name == \"due_date\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.due_date
 		## assignee?
 
 		journal_note=$(jq -r ".journals[] | select(.id == $jid) | .notes" $tidtmp/issue_journal.json)
@@ -360,6 +361,10 @@ show_ticket_journal() {
 
 		if [ -s "$tidtmp/journal_${jid}.done_ratio" ] ; then
 			echo "Done Ratio: $(cat $tidtmp/journal_${jid}.done_ratio | cut -f1) -> $(cat $tidtmp/journal_${jid}.done_ratio | cut -f2)" >> $tidtmp/${jid}.def
+		fi
+
+		if [ -s "$tidtmp/journal_${jid}.due_date" ] ; then
+			echo "Due Date: $(cat $tidtmp/journal_${jid}.due_date | cut -f1) -> $(cat $tidtmp/journal_${jid}.due_date | cut -f2)" >> $tidtmp/${jid}.def
 		fi
 
 		if [ "$(cat $tidtmp/journal_${jid}.notes)" ] ; then
