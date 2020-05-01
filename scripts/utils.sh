@@ -101,9 +101,13 @@ __update_ticket() {
 		json_add_int $outjson .issue.estimated_hours $estimate || return 1
 	fi
 	# (2019/10/25 08:22) TODO 修正まで触らない
-	if [ "$due_date" ] ; then # && [ "$due_date" != "null" ] ; then
-		local date_text="$(date -d "$due_date" +%Y-%m-%d)"
-		json_add_text $outjson .issue.due_date "$date_text" || return 1
+	if [ "$due_date" ] ; then
+		if [ "$due_date" != "null" ] ; then
+			local date_text="$(date -d "$due_date" +%Y-%m-%d)"
+			json_add_text $outjson .issue.due_date "$date_text" || return 1
+		else
+			json_add_text $outjson .issue.due_date "" || return 1
+		fi
 	fi
 	# category
 	# if [ "$version_id" ] ; then
