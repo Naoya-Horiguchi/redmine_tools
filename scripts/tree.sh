@@ -323,25 +323,52 @@ show_ticket_journal() {
 
 	jq -r ".journals[].id" $tidtmp/issue_journal.json | tac > $tidtmp/journal_ids
 	for jid in $(cat $tidtmp/journal_ids) ; do
-		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .old_value" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.1
-		jq -r ".journals[] | select(.id == $jid) | .details[] | select(.name == \"description\") | .new_value" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.2
+		jq -r ".journals[] | select(.id == $jid) | .details[]" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.details
+		jq -r ". | select(.name == \"description\") | .old_value" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.1
+		jq -r ". | select(.name == \"description\") | .new_value" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.2
+		jq -r ". | select(.name == \"subject\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.subject
+		jq -r ". | select(.name == \"parent_id\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.pid
+		jq -r ". | select(.name == \"project_id\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.pjid
+		jq -r ". | select(.name == \"status_id\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.status
+		jq -r ". | select(.name == \"done_ratio\") | [.old_value, .new_value] | @tsv" $tidtmp/journal_${jid}.details > $tidtmp/journal_${jid}.done_ratio
+		## assignee?
+
 		journal_note=$(jq -r ".journals[] | select(.id == $jid) | .notes" $tidtmp/issue_journal.json)
+		jq -r ".journals[] | select(.id == $jid) | .notes" $tidtmp/issue_journal.json > $tidtmp/journal_${jid}.notes
 
-		if [ ! -s "$tidtmp/journal_${jid}.1" ] && [ ! "$journal_note" ] ; then
-			continue
-		fi
-
-		# TODO: ステータスの変更を表示させる
 		printf "${CL_YELLOW}journal ID: ${jid}${CL_NC}\n" >> $tidtmp/abcd
 		journal_date=$(jq -r ".journals[] | select(.id == $jid) | .created_on" $tidtmp/issue_journal.json)
 		user_name=$(jq -r ".journals[] | select(.id == $jid) | .user.name" $tidtmp/issue_journal.json)
 		echo "Author: $user_name" >> $tidtmp/abcd
 		echo "Date: $(date -d $journal_date)" >> $tidtmp/abcd
 
-		echo "" >> $tidtmp/abcd
+		if [ -s "$tidtmp/journal_${jid}.subject" ] ; then
+			echo "Subject: $(cat $tidtmp/journal_${jid}.subject | cut -f1) -> $(cat $tidtmp/journal_${jid}.subject | cut -f2)" >> $tidtmp/${jid}.def
+		fi
 
-		if [ "$journal_note" ] ; then
-			echo "$journal_note" | sed 's/^/    /' >> $tidtmp/abcd
+		if [ -s "$tidtmp/journal_${jid}.pid" ] ; then
+			echo "Parent Issue: $(cat $tidtmp/journal_${jid}.pid | cut -f1) -> $(cat $tidtmp/journal_${jid}.pid | cut -f2)" >> $tidtmp/${jid}.def
+		fi
+
+		if [ -s "$tidtmp/journal_${jid}.pjid" ] ; then
+			echo "Project: $(project_to_name $(cat $tidtmp/journal_${jid}.pjid | cut -f1)) -> $(project_to_name $(cat $tidtmp/journal_${jid}.pjid | cut -f2))" >> $tidtmp/${jid}.def
+		fi
+
+		if [ -s "$tidtmp/journal_${jid}.status" ] ; then
+			echo "Status: $(status_to_name $(cat $tidtmp/journal_${jid}.status | cut -f1)) -> $(status_to_name $(cat $tidtmp/journal_${jid}.status | cut -f2))" >> $tidtmp/${jid}.def
+		fi
+
+		if [ -s "$tidtmp/journal_${jid}.done_ratio" ] ; then
+			echo "Done Ratio: $(cat $tidtmp/journal_${jid}.done_ratio | cut -f1) -> $(cat $tidtmp/journal_${jid}.done_ratio | cut -f2)" >> $tidtmp/${jid}.def
+		fi
+
+		if [ "$(cat $tidtmp/journal_${jid}.notes)" ] ; then
+			cat "$tidtmp/journal_${jid}.notes" >> $tidtmp/${jid}.def
+		fi
+
+		if [ -s $tidtmp/${jid}.def ] ; then
+			echo "" >> $tidtmp/abcd
+			sed -e 's/^/    /' $tidtmp/${jid}.def >> $tidtmp/abcd
 			echo "" >> $tidtmp/abcd
 		fi
 		git -c core.whitespace=cr-at-eol diff --color $tidtmp/journal_${jid}.1 $tidtmp/journal_${jid}.2 | tail +5 >> $tidtmp/abcd
