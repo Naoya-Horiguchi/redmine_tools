@@ -694,7 +694,7 @@ edit_issue3() {
 
 	while true ; do
 		pushd $(dirname $draft)
-		"$EDITOR" $draft
+		$EDITOR $draft
 		popd
 		ask_done_ratio_update3
 		diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
@@ -863,7 +863,7 @@ update_new_issue() {
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
 		pushd $(dirname $draft)
-		"$EDITOR" $draft
+		$EDITOR $draft
 		popd
 		[ "$NEWLOCALTID" ] && break # new local ticket
 		echo
