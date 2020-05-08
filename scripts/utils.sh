@@ -241,6 +241,7 @@ __format_to_draft() {
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# (2019/10/25 08:21) TODO なんか壊れているので修正されるまで触らないことにする。
 	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
+	echo "#+TimeEntry: 0" >> $tmpfile
 	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
 	# echo "#+Format: $RM_FORMAT" >> $tmpfile
 	if [ "$(jq -r .description $tmpjson)" != null ] ; then
@@ -305,6 +306,13 @@ __close_clock() {
 	local tin=$(date -d $cin +%s 2> /dev/null)
 	local tout=$(date -d $cout +%s 2> /dev/null)
 	local clock=$[$tout - $tin]
+
+	# time_entry explicitly given in draft file.
+	local draftClock="$(grep -i ^#\+timeentry: $TMPDIR/$RM_DRAFT_FILENAME | sed 's|^#+timeentry: *||i')"
+	if [ "$draftClock" -gt 0 ] ; then
+		create_time_entry "$issueid" "$(calc_clock_hour $[draftClock*60])" "" "" "" > /dev/null
+		return
+	fi
 
 	# TODO: error handling, activity?
 	if [ "$RM_TIME_ENTRY" == true ] ; then
@@ -643,6 +651,7 @@ convert_to_draft_from_json() {
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $draft
 	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $draft
+	echo "#+TimeEntry: 0" >> $draft
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $draft
 	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $draft
 	# echo "#+Format: $RM_FORMAT" >> $draft
@@ -825,6 +834,7 @@ generate_issue_template() {
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
 	echo "#+DueDate: null" >> $tmpfile
+	echo "#+TimeEntry: 0" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
 	# echo "#+Version: null" >> $tmpfile
 	echo "" >> $tmpfile
