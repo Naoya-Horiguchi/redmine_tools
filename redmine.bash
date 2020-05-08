@@ -28,6 +28,17 @@ if [ "$RM_CHANGE_DIRECTORY" == true ] ; then
 				bash $thisdir/scripts/main.sh $subcmd -h
 				return
 			fi
+		elif [ "$subcmd" == open ] ; then
+			if [ ! "$BROWSER" ] ; then
+				echo "you have to set environment variable BROWSER"
+				return
+			fi
+			# In some environment (like WSL), opening browser might fail
+			# if it's called from subprocess.
+			if [ "$id" -gt 0 ] ; then
+				echo "open $RM_BASEURL/issues/$id with browser."
+				eval "$BROWSER $RM_BASEURL/issues/$id"
+			fi
 		elif [ "$subcmd" == dir ] ; then
 			local issueid=$2
 			if [ -e "$RM_CONFIG/edit_memo/$issueid" ] ; then
