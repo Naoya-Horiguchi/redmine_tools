@@ -718,6 +718,12 @@ edit_issue3() {
 			return 1 # abort
 		elif [ "$input" == s ] || [ "$input" == S ] ; then
 			cp $draft $TMPD/$issueid/saved_draft
+			local currentclock="$(grep -i ^#\+timeentry: $TMPD/$issueid/saved_draft | sed 's|^#+timeentry: *||i')"
+			local openclock="$(tail -n1 $TMPD/$issueid/.clock.log | cut -f1 -d' ')"
+			openclock=$(date -d $openclock +%s 2> /dev/null)
+			local closeclock=$(date +%s 2> /dev/null)
+			local clock=$[(closeclock-openclock)/60]
+			sed -i "s/^#+timeentry:.*/#+TimeEntry: $[${currentclock%%+}+${clock}]+/i" $TMPD/$issueid/saved_draft
 			cp ${draft}.before_edit $TMPD/$issueid/saved_draft.before_edit
 			cp $TMPDIR/tmp.before_edit $TMPD/$issueid/saved_before_edit
 			return 2 # abort
