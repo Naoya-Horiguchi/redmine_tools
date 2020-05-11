@@ -705,12 +705,17 @@ edit_issue3() {
 		[[ "$issueid" =~ ^L ]] && return 0
 		cat ${draft}.edit.diff
 		echo
-		echo "You really upload this change? (y: yes, n: no, e: edit again)"
+		echo -n "You really upload this change? (y/Y: yes, n/N: no, s/S: save draft, e/E: edit again): "
 		read input
 		if [ "$input" == y ] || [ "$input" == Y ] ; then
 			return 0
 		elif [ "$input" == n ] || [ "$input" == N ] ; then
 			return 1 # abort
+		elif [ "$input" == s ] || [ "$input" == S ] ; then
+			cp $draft $TMPD/$issueid/saved_draft
+			cp ${draft}.before_edit $TMPD/$issueid/saved_draft.before_edit
+			cp $TMPDIR/tmp.before_edit $TMPD/$issueid/saved_before_edit
+			return 2 # abort
 		else
 			true # edit again
 		fi
@@ -747,19 +752,25 @@ update_issue3() {
 		__check_opened $issueid || return 1
 	fi
 
-	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
-	convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
-	echo "@@@ NOTE @@@ LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
+	if [ -s "$TMPD/$issueid/saved_before_edit" ] ; then
+		mv "$TMPD/$issueid/saved_before_edit" "$TMPDIR/tmp.before_edit"
+		mv $TMPD/$issueid/saved_draft $draft
+		mv $TMPD/$issueid/saved_draft.before_edit ${draft}.before_edit
+	else
+		__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
+		convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
+		echo "@@@ NOTE @@@ LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $draft
 
-	if [ "$REPLYNOTE" ] ; then
-		show_ticket_journal $issueid
-		jq -r ".journals[$[REPLYNOTE-1]].notes" $TMPDIR/$ISSUEID/issue_journal.json 2> /dev/null | sed 's/^/> /' > $TMPDIR/replynote
-		if [ -s "$TMPDIR/replynote" ] && [ "$(cat $TMPDIR/replynote)" != "> null" ] ; then
-			cat $TMPDIR/replynote >> $draft
+		if [ "$REPLYNOTE" ] ; then
+			show_ticket_journal $issueid
+			jq -r ".journals[$[REPLYNOTE-1]].notes" $TMPDIR/$ISSUEID/issue_journal.json 2> /dev/null | sed 's/^/> /' > $TMPDIR/replynote
+			if [ -s "$TMPDIR/replynote" ] && [ "$(cat $TMPDIR/replynote)" != "> null" ] ; then
+				cat $TMPDIR/replynote >> $draft
+			fi
 		fi
+		cp $draft ${draft}.before_edit
 	fi
 
-	cp $draft ${draft}.before_edit
 
 	[ "$RM_SAVE_CLOCK" ] && __open_clock $issueid
 	trap "__close_clock $issueid ; exit 0" 2
