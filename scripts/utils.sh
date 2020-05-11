@@ -309,8 +309,13 @@ __close_clock() {
 
 	# time_entry explicitly given in draft file.
 	local draftClock="$(grep -i ^#\+timeentry: $TMPDIR/$RM_DRAFT_FILENAME | sed 's|^#+timeentry: *||i')"
-	if [ "$draftClock" -gt 0 ] ; then
-		create_time_entry "$issueid" "$(calc_clock_hour $[draftClock*60])" "" "" "" > /dev/null
+	if [ "$draftClock" != 0 ] ; then
+		if [[ "$draftClock" =~ \+$ ]] ; then
+			local dclock=$[${draftClock%%+}*60 + $clock]
+			create_time_entry "$issueid" "$(calc_clock_hour $dclock)" "" "" "" > /dev/null
+		else
+			create_time_entry "$issueid" "$(calc_clock_hour $[draftClock*60])" "" "" "" > /dev/null
+		fi
 		return
 	fi
 
