@@ -30,11 +30,13 @@ EDIT=
 PJTREE_ONLY=
 SHOW_SUBPROJECT=
 TICKET_SUBTREE=
+COLOR=true
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
 		-e)
 			EDIT=true
+			COLOR=false
 			shift 1
 			;;
 		-c)
@@ -77,7 +79,11 @@ fi
 # only colors for terminal output
 [ ! "$EDIT" ] && [ -t 1 ] && . $THISDIR/color.sh
 . $THISDIR/tree.sh
-[ "$#" -gt 0 ] && PROJECT="$@"
+if [ "$#" -gt 0 ] ; then
+	PROJECT="$@"
+else
+	SHOW_SUBPROJECT=true
+fi
 
 DATA=$RM_CONFIG/issues.json
 
@@ -137,30 +143,11 @@ if [ "$TICKET_SUBTREE" ] ; then
 	PROJECT= # get project id
 
 	show_ticket_subtree $TICKET_SUBTREE > $TMPDIR/out
-elif [ ! "$SHOW_SUBPROJECT" ] ; then
-	for pjspec in $PROJECT ; do
-		for pjid in $(pjspec_to_pjid $pjspec) ; do
-			show_project_tree $pjid >> $TMPDIR/out
-		done
-	done
 else
-	get_project_table $RM_CONFIG/projects.json
+	jq -r ".issues[] | [.parent.id, .project.id, .id, .tracker.name, .status.name, .done_ratio, .subject, .closed_on] | @csv" ${RM_CONFIG}/issues.json | sort -k1n > $TMPDIR/issues
+	jq -r ".projects[] | [.parent.id, .id, .name] | @csv" ${RM_CONFIG}/projects.json | sort -k1n > $TMPDIR/projects
 
-	# TODO: better name b/w generate_project_table and get_project_table
-	if [ "$PJTREE_ONLY" = true ] ; then
-		PROJECT="$(cat $TMPDIR/top_level_projects)"
-		get_project_tree $PROJECT
-		exit 0
-	fi
-
-	if [ "$PROJECT" == all ] ; then
-		PROJECT="$(cat $TMPDIR/top_level_projects | tr '\n' ' ')"
-	fi
-
-	for pjspec in $PROJECT ; do
-		pjid=$(pjspec_to_pjid $pjspec) || exit 1
-		show_project_tree $pjid >> $TMPDIR/out
-	done
+	PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" COLOR=$COLOR SHOWPJONLY=$PJTREE_ONLY SHOWCLOSED=$RM_SHOW_CLOSED SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/tree.py $TMPDIR/issues $TMPDIR/projects > $TMPDIR/out
 fi
 
 if [ "$EDIT" ] ; then
