@@ -137,18 +137,12 @@ edit_tree() {
 	update_local_cache
 }
 
-update_local_cache || exit 1
+update_local_cache > /dev/null 2>&1 || exit 1
 
-if [ "$TICKET_SUBTREE" ] ; then
-	PROJECT= # get project id
+jq -r ".issues[] | [.parent.id, .project.id, .id, .tracker.name, .status.name, .done_ratio, .subject, .closed_on] | @csv" ${RM_CONFIG}/issues.json | sort -k1n > $TMPDIR/issues
+jq -r ".projects[] | [.parent.id, .id, .name] | @csv" ${RM_CONFIG}/projects.json | sort -k1n > $TMPDIR/projects
 
-	show_ticket_subtree $TICKET_SUBTREE > $TMPDIR/out
-else
-	jq -r ".issues[] | [.parent.id, .project.id, .id, .tracker.name, .status.name, .done_ratio, .subject, .closed_on] | @csv" ${RM_CONFIG}/issues.json | sort -k1n > $TMPDIR/issues
-	jq -r ".projects[] | [.parent.id, .id, .name] | @csv" ${RM_CONFIG}/projects.json | sort -k1n > $TMPDIR/projects
-
-	PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" COLOR=$COLOR SHOWPJONLY=$PJTREE_ONLY SHOWCLOSED=$RM_SHOW_CLOSED SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/tree.py $TMPDIR/issues $TMPDIR/projects > $TMPDIR/out
-fi
+TICKETS=$TICKET_SUBTREE PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" COLOR=$COLOR SHOWPJONLY=$PJTREE_ONLY SHOWCLOSED=$RM_SHOW_CLOSED SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/tree.py $TMPDIR/issues $TMPDIR/projects > $TMPDIR/out
 
 if [ "$EDIT" ] ; then
 	edit_tree $TMPDIR/out

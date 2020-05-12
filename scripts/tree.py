@@ -26,6 +26,7 @@ showColor= False
 showSubproject = False
 showPjonly = False
 projects = None
+tickets = None
 if os.environ.get('SHOWCLOSED') and re.match(r'true', os.environ.get('SHOWCLOSED'), re.IGNORECASE):
     showClosed = True
 if os.environ.get('COLOR') and re.match(r'true', os.environ.get('COLOR'), re.IGNORECASE):
@@ -36,6 +37,8 @@ if os.environ.get('SHOWPJONLY') and re.match(r'true', os.environ.get('SHOWPJONLY
     showPjonly = True
 if os.environ.get('PROJECTS'):
     projects = list(map(int, os.environ.get('PROJECTS').rsplit(',')))
+if os.environ.get('TICKETS'):
+    tickets = list(map(int, os.environ.get('TICKETS').rsplit(',')))
 
 trackers = {}
 status = {}
@@ -116,7 +119,10 @@ def show_project(pjid, depth):
         for cpj in pjTree[pjid]:
             show_project(cpj, depth + 1)
 
-if projects:
+if tickets:
+    for tid in tickets:
+        show_ticket(tid, 0)
+elif projects:
     for pj in projects:
         show_project(pj, 0)
 else:
