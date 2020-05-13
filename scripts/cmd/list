@@ -13,19 +13,16 @@
 #   -c            show closed tickets
 #   -C            hide closed tickets
 #   -g            grouping by projects
-#   -s            show subprojects
+#   -G            no grouping
 #   -h            show this message
-#
-# TODO:
-#   - too slow
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
 }
 
 PROJECT=all
-GROUPING=
-SHOW_SUBPROJECT=
+GROUPING=false
+COLOR=true
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
@@ -46,8 +43,8 @@ while [[ $# -gt 0 ]] ; do
 			GROUPING=true
 			shift 1
 			;;
-		-s)
-			SHOW_SUBPROJECT=true
+		-G)
+			GROUPING=false
 			shift 1
 			;;
 		-h)
@@ -61,99 +58,10 @@ while [[ $# -gt 0 ]] ; do
 	esac
 done
 
-[ -t 1 ] && . $THISDIR/color.sh
+[ ! -t 1 ] && COLOR=false
 [ "$#" -gt 0 ] && PROJECT="$@"
 
-rm $RM_CONFIG/tmp.local_ticket_list 2> /dev/null
+update_local_cache > /dev/null 2>&1 || exit 1
 
-generate_project_table PJTABLE
-for ltck in $(get_local_ticket_list) ; do
-	latest_clockout="$(tail -n1 $RM_CONFIG/edit_memo/$ltck/.clock.log | cut -f2 -d' ')"
-	latest_clockout="$(date -d $latest_clockout +%y%m%d_%H%M)"
-	subject="$(grep -i ^#\+subject: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+subject: *||i')"
-	project="$(grep -i ^#\+project: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+project: *||i')"
-	if [ ! "$project" ] ; then
-		project=null
-	else
-		project=${PJTABLE[$project]}
-	fi
-	status="$(grep -i ^#\+status: $RM_CONFIG/edit_memo/$ltck/draft.md | sed 's|^#+status: *||i')"
-	if status_closed "$status" ; then
-		status="<${CL_BLUE}Local${CL_NC}|${CL_DGRAY}$status${CL_NC}>"
-	else
-		status="<${CL_BLUE}Local${CL_NC}|${CL_YELLOW}$status${CL_NC}>"
-	fi
-
-	[ ! "$status" ] && status=null
-	echo -e "$ltck\t${latest_clockout}\t$project\t$status\t$subject" >> $RM_CONFIG/tmp.local_ticket_list
-done
-
-update_local_cache || exit 1
-
-show_project_task_list() {
-	local pjid="$1"
-
-	echo "List of issues under project $pjid $(project_to_name $pjid):"
-	local ifs="$IFS"
-	IFS=$'\t'
-	if [ "$RM_SHOW_CLOSED" = "true" ] ; then
-		jq -r -c ".issues[] | select(.project.id == $pjid) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
-			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-		done
-	else
-		jq -r -c ".issues[] | select((.project.id == $pjid) and (.closed_on == null)) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $RM_CONFIG/issues.json | sort -k2 | while read id update project tracker status subject ; do
-			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-		done
-	fi
-	IFS="$ifs"
-}
-
-show_global_task_list() {
-	local pjid="$@"
-	local pj
-	for pj in $pjid ; do
-		jq "[.issues[] | select(.project.id == $pj)]" $RM_CONFIG/issues.json >> $TMPDIR/filtered.json.$pj
-	done
-	jq -s '[.[][]]' $TMPDIR/filtered.json.* > $TMPDIR/filtered.json
-
-	local ifs="$IFS"
-	IFS=$'\t'
-	if [ "$RM_SHOW_CLOSED" = "true" ] ; then
-		jq -r -c ".[] | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $TMPDIR/filtered.json | sort -k2 | while read id update project tracker status subject ; do
-			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-		done
-	else
-		jq -r -c ".[] | select(.closed_on == null) | [.id, .updated_on, .project.name, .tracker.name, .status.name, .subject] | @tsv" $TMPDIR/filtered.json | sort -k2 | while read id update project tracker status subject ; do
-			printf "%s\t%s\t%s\t%s\t%s\n" "$id" "$(date -d $update +%y%m%d_%H%M)" "$project" "<$tracker|$status>" "$subject"
-		done
-	fi
-	IFS="$ifs"
-}
-
-if [ "$SHOW_SUBPROJECT" ] ; then
-	get_project_table $RM_CONFIG/projects.json
-	if [ "$PROJECT" = all ] ; then
-		PROJECT="$(cat $TMPDIR/top_level_projects)"
-	else
-		PROJECT="$(pjspec_to_pjid $PROJECT)"
-	fi
-	PROJECT="$(get_subproject_list $PROJECT)"
-else
-	if [ "$PROJECT" == all ] ; then
-		PROJECT="$(jq -r ".projects[] | .id" $RM_CONFIG/projects.json | sort -k1n)"
-	else
-		PROJECT="$(pjspec_to_pjid $PROJECT)"
-	fi
-fi
-
-if [ "$GROUPING" = true ] ; then
-	for pjspec in $PROJECT ; do
-		for pjid in $(pjspec_to_pjid $pjspec) ; do
-			show_project_task_list $pjid >> $TMPDIR/out
-		done
-	done
-	cat $TMPDIR/out | expand
-else
-	show_global_task_list $PROJECT > $TMPDIR/out
-	cat $TMPDIR/out | column -t -s $'\t'
-fi
+PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" SHOWCLOSED=$RM_SHOW_CLOSED COLOR=$COLOR GROUPING=$GROUPING python3 $THISDIR/use_json.py $RM_CONFIG/issues.json > $TMPDIR/out
+cat $TMPDIR/out | column -t -s $'\t'

@@ -128,35 +128,3 @@ elif projects:
 else:
     for pj in topPjs:
         show_project(pj, 0)
-
-# with open(sys.argv[1]) as csvDataFile:
-#     csvReader = csv.reader(csvDataFile)
-#     for row in csvReader:
-#         if row[7]:
-#             continue
-#         pjid = int(row[1])
-#         tid = int(row[2])
-#         trackers[tid] = row[3]
-#         status[tid] = row[4]
-#         ratios[tid] = int(row[5])
-#         subjects[tid] = row[6]
-#         pjTopIds[pjid].append(tid)
-
-# d = {}
-# with open(sys.argv[2]) as csvDataFile:
-#     csvReader = csv.reader(csvDataFile)
-#     for row in csvReader:
-#         if row[7]:
-#             continue
-#         pjid = int(row[1])
-#         tid = int(row[2])
-#         pid = int(row[0])
-#         trackers[tid] = row[3]
-#         status[tid] = row[4]
-#         ratios[tid] = int(row[5])
-#         subjects[tid] = row[6]
-#         pjTopIds[pjid].append(tid)
-#         if pid in d:
-#             d[pid].append(tid)
-#         else:
-#             d[pid] = [tid]
