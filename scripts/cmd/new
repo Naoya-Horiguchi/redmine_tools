@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]] ; do
 			TEMPLATE=$2
 			shift 2
 			if [ ! -s "$TEMPLATE" ] ; then
-				RM_SHOW_JOURNALS= . $THISDIR/cmd/show "$TEMPLATE" > $TMPDIR/template || exit 1
+				SHOW_JOURNALS=$SHOW_JOURNALS python3 $THISDIR/show_ticket.py $TEMPLATE > $TMPDIR/template
 				TEMPLATE=$TMPDIR/template
 			fi
 			;;

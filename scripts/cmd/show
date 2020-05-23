@@ -85,12 +85,6 @@ fi
 update_local_cache_task $ISSUEID || exit 1
 ! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
-if [ "$SHOW_JOURNALS" ] ; then
-	show_ticket_journal $ISSUEID
-	# cat $TMPDIR/$ISSUEID/abcd | less -R
-	# cat $TMPDIR/$ISSUEID/abcd
-fi
-
 if [ "$SHOW_TREE" ] ; then
 	PROJECT=
 	show_ticket_subtree $ISSUEID > $TMPDIR/out
@@ -109,6 +103,9 @@ if [ "$SHOW_TREE" ] ; then
 		md-to-pdf $TMPDIR/index.md ./output.pdf
 	fi
 else
+	SHOW_JOURNALS=$SHOW_JOURNALS python3 $THISDIR/show_ticket.py $ISSUEID | less -R
+	exit
+
 	tmpfile=$TMPDIR/tmp.show.txt
 	__curl "/issues.json" $TMPDIR/tmp.show "&issue_id=$ISSUEID&include=relations&status_id=*"
 	convert_to_draft_from_json $ISSUEID $TMPDIR/tmp.show $tmpfile
