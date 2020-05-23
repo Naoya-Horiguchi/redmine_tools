@@ -15,12 +15,6 @@ def print_six(row, format):
         else:
             print("   ", end=" ")
 
-# for row in range(-1,42):
-#     print_six(row, fg)
-#     print("",end=" ")
-#     print_six(row, bg)
-#     print()
-
 showClosed = False
 showColor= False
 showSubproject = False
