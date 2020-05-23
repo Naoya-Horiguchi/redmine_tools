@@ -1,7 +1,7 @@
 # TODO: loading as associative array instead of calling jq
 
 tracker_to_id() {
-	jq -r ".trackers[] | select(.name == \"$1\") | .id" $RM_CONFIG/trackers.json
+	jq -r ".trackers[] | select(.name|test(\"$1\";\"i\")) | .id" $RM_CONFIG/trackers.json
 }
 
 tracker_to_name() {
@@ -84,7 +84,7 @@ priorityspec_to_priorityid() {
 }
 
 status_to_id() {
-	jq -r ".issue_statuses[] | select(.name == \"$1\") | .id" $RM_CONFIG/issue_statuses.json
+	jq -r ".issue_statuses[] | select(.name|test(\"$1\";\"i\")) | .id" $RM_CONFIG/issue_statuses.json
 }
 
 status_to_name() {
@@ -121,12 +121,15 @@ userspec_to_userid() {
 	local spec="$1"
 	local re='^[0-9]+$'
 
+	if [ ! "$spec" ]  ; then
+		return
+	fi
 	if [[ "$spec" =~ $re ]] ; then
 		echo "$spec"
 	else
 		# TODO: if found multiple record? -> first match
 		# TODO: escape input? what if pjspec contains ','?
-		jq -r ".users[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/users.json
+		jq -r ".users[] | select(.login|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/users.json
 	fi
 }
 
