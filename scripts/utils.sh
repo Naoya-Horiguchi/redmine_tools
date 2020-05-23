@@ -45,13 +45,16 @@ __update_ticket() {
 	# TODO: user name/id どちらでも登録できるようにしたい
 	# TODO: ユーザリストがない場合の対応
 
-	if [ ! -s "$RM_CONFIG/users.json" ] ; then
+	if [ -s "$RM_CONFIG/users.json" ] ; then
 		local assigned="$(grep -i ^#\+assigned: $file | sed 's|^#+assigned: *||i')"
-		local assigned_id="$(userspec_to_userid "$assigned")"
+		if [ "$assigned" ] ; then
+			local assigned_id="$(userspec_to_userid "$assigned")"
+		fi
 	fi
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
+
 	# category
 	# local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
 	# TODO: input in string format "<project> - <version>" is not supported yet.
@@ -92,6 +95,7 @@ __update_ticket() {
 		json_add_int $outjson .issue.parent_issue_id $parent_id || return 1
 	fi
 	if [ "$assigned_id" ] ; then
+		# echo "assigned_id: $assigned_id" >&2
 		json_add_int $outjson .issue.assigned_to_id $assigned_id || return 1
 	fi
 	if [ "$done_ratio" ] ; then
@@ -102,7 +106,7 @@ __update_ticket() {
 	fi
 	# (2019/10/25 08:22) TODO 修正まで触らない
 	if [ "$due_date" ] ; then
-		if [ "$due_date" != "null" ] ; then
+		if [ "$due_date" != "null" ] && [ "$due_date" != "None" ] ; then
 			local date_text="$(date -d "$due_date" +%Y-%m-%d)"
 			json_add_text $outjson .issue.due_date "$date_text" || return 1
 		else
@@ -875,7 +879,8 @@ create_issue2() {
 	# issueid is defined in caller update_issue()
 	issueid=$newissueid
 
-	update_relations2 "$issueid" "$draft" || return 1
+	# TODO: refrain updating relations now
+	# update_relations2 "$issueid" "$draft" || return 1
 }
 
 update_new_issue() {
