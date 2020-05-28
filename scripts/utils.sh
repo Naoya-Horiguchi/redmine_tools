@@ -101,7 +101,7 @@ __update_ticket() {
 	if [ "$done_ratio" ] ; then
 		json_add_int $outjson .issue.done_ratio $done_ratio || return 1
 	fi
-	if [ "$estimate" ] ; then
+	if [ "$estimate" ] && [ "$estimate" != "None" ] ; then
 		json_add_int $outjson .issue.estimated_hours $estimate || return 1
 	fi
 	# (2019/10/25 08:22) TODO 修正まで触らない
