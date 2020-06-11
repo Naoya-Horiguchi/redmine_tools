@@ -145,4 +145,8 @@ issueid_to_done_ratio() {
 	jq -r ".issues[] | select(.id == $1) | .done_ratio" $RM_CONFIG/issues.json
 }
 
+tracker_to_default_status_name() {
+	jq -r ".trackers[] | select(.id == $1) | .default_status.name" $RM_CONFIG/trackers.json
+}
+
 # TODO: add some for version
