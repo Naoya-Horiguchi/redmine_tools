@@ -244,10 +244,13 @@ create_pjtree_ticket() {
 	local line="$2"
 
 	local metafield="$(echo "$line" | awk -F'[><]' '{print $2}')"
-	local tracker="$(echo $metafield | cut -f1 -d\|)"
-	local status="$(echo $metafield | cut -f2 -d\|)"
+	local tracker="$(echo $metafield\| | cut -f1 -d\|)"
+	local status="$(echo $metafield\| | cut -f2 -d\|)"
 	# local newrelations="$(echo "$line" | sed 's/.*(\([0-9>|=#,-]\+\)).*/\1/')"
 	local subject="$(echo "$line" | cut -f2- -d \> | sed 's/^ *//')"
+
+	# default value
+	[ ! "$status" ] && status=$(tracker_to_default_status_name $(tracker_to_id $tracker))
 
 	# TODO: remove duplicate
 	cat <<EOF > $TMPDIR/update.json
