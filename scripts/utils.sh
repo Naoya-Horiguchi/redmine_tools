@@ -35,8 +35,8 @@ __update_ticket() {
 	local project_id="$(pjspec_to_pjid "$project")"
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
 	local tracker_id="$(trackerspec_to_trackerid "$tracker")"
-	local category="$(grep -i ^#\+category: $file | sed 's|^#+category: *||i')"
-	local category_id="$(categoryspec_to_categoryid "$category")"
+	# local category="$(grep -i ^#\+category: $file | sed 's|^#+category: *||i')"
+	# local category_id="$(categoryspec_to_categoryid "$category")"
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
 	local status_id="$(statusspec_to_statusid "$status")"
 	local priority="$(grep -i ^#\+priority: $file | sed 's|^#+priority: *||i')"
@@ -55,7 +55,6 @@ __update_ticket() {
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
 
-	# category
 	# local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
 	# TODO: input in string format "<project> - <version>" is not supported yet.
 	# if [ -s "$RM_CONFIG/versions/${project_id}.json" ] ; then
@@ -67,7 +66,6 @@ __update_ticket() {
 	grep -v "^#+" $file | awk '/^@@@ NOTE @@@/{p=1;next}{if(p){print}}' > $TMPDIR/note
 
     # is_private
-    # category_id
     # watcher_user_ids
 	echo "{\"issue\": {}}" > $outjson
 	if [ "$subject" ] ; then
@@ -83,6 +81,8 @@ __update_ticket() {
 		json_add_int $outjson .issue.tracker_id $tracker_id || return 1
 	fi
 	if [ "$category_id" ] ; then
+		echo "DONT USE CATEGORY, THIS IS BROKEN. $category_id"
+		return 1
 		json_add_int $outjson .issue.category_id $category_id || return 1
 	fi
 	if [ "$status_id" ] ; then
@@ -236,7 +236,7 @@ __format_to_draft() {
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $tmpfile
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $tmpfile
-	echo "#+Category: $(jq -r .category.name $tmpjson)" >> $tmpfile
+	# echo "#+Category: $(jq -r .category.name $tmpjson)" >> $tmpfile
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $tmpfile
 	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $tmpfile
 	if [ "$RM_USERLIST" ] ; then
@@ -652,7 +652,7 @@ convert_to_draft_from_json() {
 	echo "#+Subject: $(jq -r .subject $tmpjson)" >> $draft
 	echo "#+Project: $(jq -r .project.name $tmpjson)" >> $draft
 	echo "#+Tracker: $(jq -r .tracker.name $tmpjson)" >> $draft
-	echo "#+Category: $(jq -r .category.name $tmpjson)" >> $draft
+	# echo "#+Category: $(jq -r .category.name $tmpjson)" >> $draft
 	echo "#+Priority: $(jq -r .priority.name $tmpjson)" >> $draft
 	echo "#+ParentIssue: $(jq -r .parent.id $tmpjson)" >> $draft
 	if [ "$RM_USERLIST" ] ; then
@@ -850,7 +850,7 @@ generate_issue_template() {
 	echo "#+Subject: subject" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
 	echo "#+Tracker: " >> $tmpfile
-	echo "#+Category: null" >> $tmpfile
+	# echo "#+Category: null" >> $tmpfile
 	echo "#+Status: New" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
 	echo "#+ParentIssue: null" >> $tmpfile
