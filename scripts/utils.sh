@@ -298,11 +298,8 @@ __open_clock() {
 	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
 }
 
-__close_clock() {
-	local issueid=$1
-	trap 2
-	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
-	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+__create_time_entry() {
+	local issueid="$1"
 
 	local record="$(tail -n1 $TMPD/$issueid/.clock.log)"
 	local cin=$(echo $record | cut -f1 -d' ')
@@ -331,6 +328,14 @@ __close_clock() {
 			fi
 		fi
 	fi
+}
+
+__close_clock() {
+	local issueid=$1
+	trap 2
+	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
+	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
+	__create_time_entry $issueid
 }
 
 calc_clock_hour() {
@@ -913,6 +918,7 @@ update_new_issue() {
 		echo "new ticket: $issueid"
 		mkdir -p $TMPD/$issueid
 		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
+		__create_time_entry $issueid
 		( update_local_cache_task $issueid ) &
 	elif [ "$NEWLOCALTID" ] ; then
 		echo "new ticket: $NEWLOCALTID"
