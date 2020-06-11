@@ -5,6 +5,7 @@ import re
 
 showClosed = False
 showColor= False
+showSubproject = False
 projects = None
 tickets = None
 grouping = False
@@ -12,6 +13,8 @@ if os.environ.get('SHOWCLOSED') and re.match(r'true', os.environ.get('SHOWCLOSED
     showClosed = True
 if os.environ.get('COLOR') and re.match(r'true', os.environ.get('COLOR'), re.IGNORECASE):
     showColor = True
+if os.environ.get('SHOWSUBPROJECT') and re.match(r'true', os.environ.get('SHOWSUBPROJECT'), re.IGNORECASE):
+    showSubproject = True
 if os.environ.get('PROJECTS'):
     projects = list(map(int, os.environ.get('PROJECTS').rsplit(',')))
 if os.environ.get('TICKETS'):
@@ -43,6 +46,25 @@ def print_six(row, format):
         else:
             print("   ", end=" ")
 
+pjParent = {}
+pjIncluded = {}
+with open(sys.argv[2]) as proj_json:
+    data = json.load(proj_json)
+    for pj in data['projects']:
+        if 'parent' in pj:
+            pjParent[pj['id']] = pj['parent']['id']
+    for pj in data['projects']:
+        pjid = pj['id']
+        pjid2 = pjid
+        while True:
+            if projects and pjid in projects:
+                pjIncluded[pjid2] = True
+                break
+            if showSubproject and (pjid in pjParent):
+                pjid = pjParent[pjid]
+            else:
+                break
+
 with open(sys.argv[1]) as json_file:
     data = json.load(json_file)
     for p in data['issues']:
@@ -54,7 +76,7 @@ with open(sys.argv[1]) as json_file:
             pjNames[pjid] = p['project']['name']
         if p['closed_on'] and showClosed == False:
             continue
-        if projects and not pjid in projects:
+        if projects and not pjid in pjIncluded:
             continue
         pjIds[pjid].append(tid)
         globalIds.append(tid)

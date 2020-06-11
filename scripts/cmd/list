@@ -14,6 +14,7 @@
 #   -C            hide closed tickets
 #   -g            grouping by projects
 #   -G            no grouping
+#   -s            show subprojects
 #   -h            show this message
 
 show_help() {
@@ -22,6 +23,7 @@ show_help() {
 
 PROJECT=
 GROUPING=false
+SHOW_SUBPROJECT=
 COLOR=true
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -47,6 +49,10 @@ while [[ $# -gt 0 ]] ; do
 			GROUPING=false
 			shift 1
 			;;
+		-s)
+			SHOW_SUBPROJECT=true
+			shift 1
+			;;
 		-h)
 			show_help
 			exit 0
@@ -63,5 +69,5 @@ done
 
 update_local_cache > /dev/null 2>&1 || exit 1
 
-PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" SHOWCLOSED=$RM_SHOW_CLOSED COLOR=$COLOR GROUPING=$GROUPING python3 $THISDIR/use_json.py $RM_CONFIG/issues.json > $TMPDIR/out
+PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" SHOWCLOSED=$RM_SHOW_CLOSED COLOR=$COLOR GROUPING=$GROUPING SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/use_json.py $RM_CONFIG/issues.json $RM_CONFIG/projects.json > $TMPDIR/out
 cat $TMPDIR/out | column -t -s $'\t'
