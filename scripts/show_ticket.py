@@ -47,7 +47,8 @@ if 'assigned_to' in issue.keys():
 print("#+Estimate: %s" % issue['estimated_hours'])
 print("#+DueDate: %s" % issue['due_date'])
 
-print(issue['description'].replace('\r', ''))
+if issue['description']:
+    print(issue['description'].replace('\r', ''))
 
 def print_six(row, format):
     for col in range(6):
