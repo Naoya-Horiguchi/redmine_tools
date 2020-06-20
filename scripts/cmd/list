@@ -69,5 +69,5 @@ done
 
 update_local_cache > /dev/null 2>&1 || exit 1
 
-PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" SHOWCLOSED=$RM_SHOW_CLOSED COLOR=$COLOR GROUPING=$GROUPING SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/use_json.py $RM_CONFIG/issues.json $RM_CONFIG/projects.json > $TMPDIR/out
-cat $TMPDIR/out | column -t -s $'\t'
+PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" SHOWCLOSED=$RM_SHOW_CLOSED COLOR=$COLOR GROUPING=$GROUPING SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/use_json.py $RM_CONFIG/issues.json $RM_CONFIG/projects.json $RM_CONFIG/trackers.json > $TMPDIR/out
+cat $TMPDIR/out

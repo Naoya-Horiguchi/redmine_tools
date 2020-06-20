@@ -46,6 +46,12 @@ def print_six(row, format):
         else:
             print("   ", end=" ")
 
+# for row in range(-1,42):
+#     print_six(row, fg)
+#     print("",end=" ")
+#     print_six(row, bg)
+#     print()
+
 pjParent = {}
 pjIncluded = {}
 with open(sys.argv[2]) as proj_json:
@@ -64,6 +70,16 @@ with open(sys.argv[2]) as proj_json:
                 pjid = pjParent[pjid]
             else:
                 break
+
+defaultTracker = {}
+trackerColor = {}
+i = 1
+with open(sys.argv[3]) as tracker_json:
+    data = json.load(tracker_json)
+    for tracker in data['trackers']:
+        trackerColor[tracker['name']] = i
+        i += 1
+        defaultTracker[tracker['name']] = tracker['default_status']['name']
 
 with open(sys.argv[1]) as json_file:
     data = json.load(json_file)
@@ -86,15 +102,18 @@ with open(sys.argv[1]) as json_file:
         ratios[tid] = int(p['done_ratio'])
         if showColor == True:
             if closeds[tid]:
-                status[tid] = fg(p['status']['name'], 243)
+                status[tid] = fg(p['status']['name'], 238)
+            elif p['status']['name'] == defaultTracker[trackers[tid]]:
+                status[tid] = fg(p['status']['name'], 200)
             else:
-                status[tid] = fg(p['status']['name'], 32)
+                status[tid] = fg(p['status']['name'], 228)
             if ratios[tid] == 0:
                 ratios[tid] = fg(str(ratios[tid]), 200)
             elif ratios[tid] == 100:
                 ratios[tid] = fg(str(ratios[tid]), 48)
             else:
                 ratios[tid] = fg(str(ratios[tid]), 228)
+            trackers[tid] = fg(trackers[tid], trackerColor[trackers[tid]])
         else:
             status[tid] = p['status']['name']
             ratios[tid] = str(ratios[tid])
@@ -105,7 +124,7 @@ def take_updated_on(tid):
     return updateds[tid]
 
 def show_project(pj):
-    print("PJ%d\t%s" % (pj, pjNames[pj]))
+    print("PJ%d %s" % (pj, pjNames[pj]))
     sorted_tids = sorted(pjIds[pj], key=take_updated_on)
     for tid in sorted_tids:
         show_ticket(tid, False)
@@ -113,9 +132,9 @@ def show_project(pj):
 
 def show_ticket(tid, showPj):
     if showPj:
-        print("%d\t%s\tPJ%d\t<%s|%s|%s>\t%s" % (tid, updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid],  subjects[tid]))
+        print("%s\tPJ%d\t<%s|%s|%s>\t%d\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], tid, subjects[tid]))
     else:
-        print("%d\t%s\t<%s|%s|%s>\t%s" % (tid, updateds[tid], trackers[tid], status[tid], ratios[tid],  subjects[tid]))
+        print("%s\t<%s|%s|%s>\t%d\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], tid, subjects[tid]))
 
 if not grouping:
     sorted_tids = sorted(globalIds, key=take_updated_on)

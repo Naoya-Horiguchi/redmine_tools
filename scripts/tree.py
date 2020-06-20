@@ -2,6 +2,7 @@ import sys
 import csv
 import os
 import re
+import json
 
 fg = lambda text, color: "\33[38;5;" + str(color) + "m" + text + "\33[0m"
 bg = lambda text, color: "\33[48;5;" + str(color) + "m" + text + "\33[0m"
@@ -61,6 +62,16 @@ with open(sys.argv[2]) as csvDataFile:
             else:
                 pjTree[pid] = [pjid]
 
+defaultTracker = {}
+trackerColor = {}
+i = 1
+with open(sys.argv[3]) as tracker_json:
+    data = json.load(tracker_json)
+    for tracker in data['trackers']:
+        trackerColor[tracker['name']] = i
+        i += 1
+        defaultTracker[tracker['name']] = tracker['default_status']['name']
+
 d = {}
 with open(sys.argv[1]) as csvDataFile:
     csvReader = csv.reader(csvDataFile)
@@ -73,15 +84,18 @@ with open(sys.argv[1]) as csvDataFile:
         ratios[tid] = int(row[5])
         if showColor == True:
             if row[7]:
-                status[tid] = fg(row[4], 243)
+                status[tid] = fg(row[4], 238)
+            elif row[4] == defaultTracker[trackers[tid]]:
+                status[tid] = fg(row[4], 200)
             else:
-                status[tid] = fg(row[4], 32)
+                status[tid] = fg(row[4], 228)
             if ratios[tid] == 0:
                 ratios[tid] = fg(row[5], 200)
             elif ratios[tid] == 100:
                 ratios[tid] = fg(row[5], 48)
             else:
                 ratios[tid] = fg(row[5], 228)
+            trackers[tid] = fg(trackers[tid], trackerColor[trackers[tid]])
         else:
             status[tid] = row[4]
             ratios[tid] = row[5]
