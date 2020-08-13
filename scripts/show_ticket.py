@@ -32,6 +32,7 @@ text = json.loads(data.decode(encoding))
 
 issue = text['issue']
 
+print("#+Issue: %s" % issue['id'])
 print("#+DoneRatio: %s" % issue['done_ratio'])
 print("#+Status: %s" % issue['status']['name'])
 print("#+Subject: %s" % issue['subject'])
@@ -44,8 +45,10 @@ if 'parent' in issue.keys():
     print("#+ParentIssue: %s" % issue['parent']['id'])
 if 'assigned_to' in issue.keys():
     print("#+Assigned: %s" % issue['assigned_to']['name'])
-print("#+Estimate: %s" % issue['estimated_hours'])
-print("#+DueDate: %s" % issue['due_date'])
+if 'estimated_hours' in issue.keys():
+    print("#+Estimate: %s" % issue['estimated_hours'])
+if 'due_date' in issue.keys():
+    print("#+DueDate: %s" % issue['due_date'])
 
 if issue['description']:
     print(issue['description'].replace('\r', ''))

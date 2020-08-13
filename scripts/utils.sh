@@ -841,7 +841,7 @@ generate_issue_template() {
 
 	if [ "$TEMPLATE" ] ; then
 		if [ -s "$TEMPLATE" ] ; then
-			cat $TEMPLATE | sed -e 's/^#+Status:.*/#+Status: New/' -e 's/^#+DoneRatio:.*/#+DoneRatio: 0/' > $tmpfile
+			cat $TEMPLATE | sed -e 's/^#+Status:.*/#+Status: New/' -e 's/^#+DoneRatio:.*/#+DoneRatio: 0/' | grep -iv "#^issue:" > $tmpfile
 			return
 		else
 			echo "Template file $TEMPLATE not found"
