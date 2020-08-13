@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# Usage
+#   redmine attach [options] <issue ID> <file>[..<file>]
+#
+# Description
+#   attach given file(s) to a given issue, and return urls
+#   to standard output.
+#
+# Options
+#   -l            list attachment
+#   -h            show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+REPLYNOTE=
+LIST=
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-l)
+			LIST=true
+			shift
+			;;
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+. $THISDIR/tree.sh
+
+ISSUEID=$1
+shift
+FILES="$@"
+
+if [ "$LIST" ] ; then
+	# jq ".issues[] | [.id, .attachments[]] | @tsv" $RM_CONFIG/issues.json
+	# jq ".issues[] as $in | $in.instances[] as $h | $in | del(.instances) as $in2 |  $h * $in2 " $RM_CONFIG/issues.json
+	# jq ".issues[] as $in | $in.instances[] as $h | $in " $RM_CONFIG/issues.json
+	# jq '.issues[] as $in | $in.attachments as $h | $in * $h' $RM_CONFIG/issues.json
+	jq -r '.issues[].attachments[] | .content_url' $RM_CONFIG/issues.json
+	exit 0
+fi
+
+if [ ! "$FILES" ] ; then
+	echo "No file specified" >&2
+	exit 1
+fi
+
+count=0
+for f in $FILES ; do
+	count=$[count + 1]
+	base=$(basename $f)
+
+	if [[ "$f" =~ ^http* ]] ; then
+		curl -o $TMPDIR/$base $f
+		f=$TMPDIR/$base
+		echo $f
+	elif [ ! -s "$f" ] ; then
+		echo "file $f not found or empty" >&2
+		exit 1
+	fi
+
+	curl ${INSECURE:+-k} -s -H "Content-Type: application/octet-stream" -X POST --data-binary "@${f}" -H "X-Redmine-API-Key: $RM_KEY" -o $TMPDIR/tmp.$count $RM_BASEURL/uploads.json?filename=$f || exit 1
+	token=$(jq -r .upload.token $TMPDIR/tmp.$count)
+	# token="32.d43dd2efa2f315eb0d36a7584c6561dad759371ecd4dc3011aa0c33878cae970"
+
+	extension="${f##*.}"
+	if [ "$extension" = "png" ] ; then
+		contentType=image/png
+	fi
+
+	__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$ISSUEID&include=attachments&status_id=*"
+	jq .issues[0] $TMPDIR/tmp.before_edit > $TMPDIR/tmp.before_edit2
+	pjid=$(jq .project.id $TMPDIR/tmp.before_edit2)
+	subject=$(jq .subject $TMPDIR/tmp.before_edit2)
+	tracker=$(jq .tracker.id $TMPDIR/tmp.before_edit2)
+	status=$(jq .status.id $TMPDIR/tmp.before_edit2)
+	cat <<EOF > $TMPDIR/tmp.$count.upload.json
+{
+  "issue": {
+	"project_id": "$pjid",
+	"subject": $subject,
+    "id": "$ISSUEID",
+    "uploads": []
+  }
+}
+EOF
+	cp $TMPDIR/tmp.$count.upload.json $TMPDIR/tmp.$count.upload.json2
+
+	jq ".issue.uploads |= [{\"token\": \"$token\", \"filename\": \"$(basename $f)\", \"content_type\": \"$contentType\"}]" $TMPDIR/tmp.$count.upload.json2 > $TMPDIR/tmp.$count.upload.json || exit 1
+	curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X PUT --data-binary "@$TMPDIR/tmp.$count.upload.json" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/issues/${ISSUEID}.json || exit 1
+done
+
+( update_local_cache_task $ISSUEID ) &
+exit 0
