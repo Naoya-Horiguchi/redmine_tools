@@ -90,7 +90,7 @@ with open(sys.argv[1]) as json_file:
             pjIds[pjid] = []
         if not pjid in pjNames.keys():
             pjNames[pjid] = p['project']['name']
-        if p['closed_on'] and showClosed == False:
+        if 'closed_on' in p.keys() and p['closed_on'] and showClosed == False:
             continue
         if projects and not pjid in pjIncluded:
             continue
@@ -98,7 +98,10 @@ with open(sys.argv[1]) as json_file:
         globalIds.append(tid)
         subjects[tid] = p['subject']
         trackers[tid] = p['tracker']['name']
-        closeds[tid] = p['closed_on']
+        if ( 'closed_on' in p.keys() ):
+            closeds[tid] = p['closed_on']
+        else:
+            closeds[tid] = None
         ratios[tid] = int(p['done_ratio'])
         if showColor == True:
             if closeds[tid]:
