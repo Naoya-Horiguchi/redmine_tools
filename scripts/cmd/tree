@@ -140,7 +140,7 @@ edit_tree() {
 update_local_cache > /dev/null 2>&1 || exit 1
 
 # TODO: this computation should be done in python script.
-jq -r ".issues[] | [.parent.id, .project.id, .id, .tracker.name, .status.name, .done_ratio, .subject, .closed_on] | @csv" ${RM_CONFIG}/issues.json | sort -k1n > $TMPDIR/issues
+jq -r ".issues[] | [.parent.id, .project.id, .id, .tracker.name, .status.name, .done_ratio, .subject, .closed_on, .priority.id] | @csv" ${RM_CONFIG}/issues.json | sort -k1n > $TMPDIR/issues
 jq -r ".projects[] | [.parent.id, .id, .name] | @csv" ${RM_CONFIG}/projects.json | sort -k1n > $TMPDIR/projects
 
 TICKETS=$TICKET_SUBTREE PROJECTS="$(pjspec_to_pjid $PROJECT | tr ' ' ',')" COLOR=$COLOR SHOWPJONLY=$PJTREE_ONLY SHOWCLOSED=$RM_SHOW_CLOSED SHOWSUBPROJECT=${SHOW_SUBPROJECT} python3 $THISDIR/tree.py $TMPDIR/issues $TMPDIR/projects $RM_CONFIG/trackers.json > $TMPDIR/out

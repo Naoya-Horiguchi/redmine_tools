@@ -40,6 +40,7 @@ status = {}
 ratios = {}
 subjects = {}
 closeds = {}
+prios = {}
 
 topPjs = []
 pjTree = {}
@@ -82,6 +83,7 @@ with open(sys.argv[1]) as csvDataFile:
         tid = int(row[2])
         trackers[tid] = row[3]
         ratios[tid] = int(row[5])
+        prios[tid] = int(row[8])
         if showColor == True:
             if row[7]:
                 status[tid] = fg(row[4], 238)
@@ -95,6 +97,16 @@ with open(sys.argv[1]) as csvDataFile:
                 ratios[tid] = fg(row[5], 48)
             else:
                 ratios[tid] = fg(row[5], 228)
+            if prios[tid] == 1:
+                prios[tid] = fg(str(prios[tid]), 8)
+            elif prios[tid] == 2:
+                prios[tid] = fg(str(prios[tid]), 4)
+            elif prios[tid] == 3:
+                prios[tid] = fg(str(prios[tid]), 2)
+            elif prios[tid] == 4:
+                prios[tid] = fg(str(prios[tid]), 3)
+            elif prios[tid] == 5:
+                prios[tid] = fg(str(prios[tid]), 1)
             trackers[tid] = fg(trackers[tid], trackerColor[trackers[tid]])
         else:
             status[tid] = row[4]
@@ -113,7 +125,7 @@ with open(sys.argv[1]) as csvDataFile:
 # print(d)
 
 def show_ticket(tid, depth):
-    print("%s%d <%s|%s|%s> %s" % ("  "*depth, tid, trackers[tid], status[tid], ratios[tid], subjects[tid]))
+    print("%s%d <%s|%s|%s|%s> %s" % ("  "*depth, tid, trackers[tid], status[tid], ratios[tid], prios[tid], subjects[tid]))
     if tid in d:
         for cid in d[tid]:
             show_ticket(cid, depth+1)
