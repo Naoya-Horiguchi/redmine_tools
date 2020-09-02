@@ -29,6 +29,7 @@ ratios = {}
 updateds = {}
 closeds = {}
 pjs = {}
+prios = {}
 
 pjIds = {}
 pjNames = {}
@@ -103,6 +104,7 @@ with open(sys.argv[1]) as json_file:
         else:
             closeds[tid] = None
         ratios[tid] = int(p['done_ratio'])
+        prios[tid] = p['priority']['id']
         if showColor == True:
             if closeds[tid]:
                 status[tid] = fg(p['status']['name'], 238)
@@ -116,6 +118,16 @@ with open(sys.argv[1]) as json_file:
                 ratios[tid] = fg(str(ratios[tid]), 48)
             else:
                 ratios[tid] = fg(str(ratios[tid]), 228)
+            if prios[tid] == 1:
+                prios[tid] = fg(str(prios[tid]), 8)
+            elif prios[tid] == 2:
+                prios[tid] = fg(str(prios[tid]), 4)
+            elif prios[tid] == 3:
+                prios[tid] = fg(str(prios[tid]), 2)
+            elif prios[tid] == 4:
+                prios[tid] = fg(str(prios[tid]), 3)
+            elif prios[tid] == 5:
+                prios[tid] = fg(str(prios[tid]), 1)
             trackers[tid] = fg(trackers[tid], trackerColor[trackers[tid]])
         else:
             status[tid] = p['status']['name']
@@ -135,9 +147,9 @@ def show_project(pj):
 
 def show_ticket(tid, showPj):
     if showPj:
-        print("%s\tPJ%d\t<%s|%s|%s>\t%d\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], tid, subjects[tid]))
+        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, subjects[tid]))
     else:
-        print("%s\t<%s|%s|%s>\t%d\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], tid, subjects[tid]))
+        print("%s\t<%s|%s|%s|%s>\t%d\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, subjects[tid]))
 
 if not grouping:
     sorted_tids = sorted(globalIds, key=take_updated_on)
