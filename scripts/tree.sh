@@ -223,7 +223,7 @@ EOF
 
 	local newparent="$(find_new_parent $issueid)"
 	if [ "$newparent" ] ; then
-		jq ".issue.parent_issue_id += \"$newparent\"" $TMPDIR/update.json > $TMPDIR/update.json2
+		jq ".issue.parent_issue_id += $newparent" $TMPDIR/update.json > $TMPDIR/update.json2
 		mv $TMPDIR/update.json2 $TMPDIR/update.json
 	fi
 
