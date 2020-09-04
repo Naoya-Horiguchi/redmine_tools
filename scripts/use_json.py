@@ -2,6 +2,7 @@ import sys
 import json
 import os
 import re
+import csv
 
 showClosed = False
 showColor= False
@@ -9,6 +10,7 @@ showSubproject = False
 projects = None
 tickets = None
 grouping = False
+relationFile = None
 if os.environ.get('SHOWCLOSED') and re.match(r'true', os.environ.get('SHOWCLOSED'), re.IGNORECASE):
     showClosed = True
 if os.environ.get('COLOR') and re.match(r'true', os.environ.get('COLOR'), re.IGNORECASE):
@@ -21,6 +23,8 @@ if os.environ.get('TICKETS'):
     tickets = list(map(int, os.environ.get('TICKETS').rsplit(',')))
 if os.environ.get('GROUPING') and re.match(r'true', os.environ.get('GROUPING'), re.IGNORECASE):
     grouping = True
+if os.environ.get('RELATIONS'):
+    relationFile = os.environ.get('RELATIONS')
 
 subjects = {}
 trackers = {}
@@ -135,6 +139,30 @@ with open(sys.argv[1]) as json_file:
         updateds[tid] = p['updated_on']
         pjs[tid] = pjid
 
+relations = {}
+if relationFile:
+    with open(relationFile) as tsv_file:
+        tsv = csv.reader(tsv_file, delimiter="\t")
+        for row in tsv:
+            if not row[0] in relations.keys():
+                relations[row[0]] = []
+            if not row[2] in relations.keys():
+                relations[row[2]] = []
+            if row[1] == "relates":
+                relations[row[0]].append("-%s" % (row[2]))
+            elif row[1] == "blocks":
+                relations[row[0]].append("-o%s" % (row[2]))
+                relations[row[2]].append("o-%s" % (row[0]))
+            elif row[1] == "precedes":
+                relations[row[0]].append("->%s" % (row[2]))
+                relations[row[2]].append("<-%s" % (row[0]))
+            elif row[1] == "duplicates":
+                relations[row[0]].append("=%s" % (row[2]))
+    for rel in relations:
+        relations[rel] = ",".join(relations[rel])
+        if relations[rel] != "":
+            relations[rel] = "(%s)" % (relations[rel])
+
 def take_updated_on(tid):
     return updateds[tid]
 
@@ -146,10 +174,13 @@ def show_project(pj):
     print("")
 
 def show_ticket(tid, showPj):
+    rel = ""
+    if str(tid) in relations.keys():
+        rel = relations[str(tid)]
     if showPj:
-        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, subjects[tid]))
+        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, rel, subjects[tid]))
     else:
-        print("%s\t<%s|%s|%s|%s>\t%d\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, subjects[tid]))
+        print("%s\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, rel, subjects[tid]))
 
 if not grouping:
     sorted_tids = sorted(globalIds, key=take_updated_on)

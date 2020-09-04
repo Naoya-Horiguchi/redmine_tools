@@ -22,6 +22,7 @@ showSubproject = False
 showPjonly = False
 projects = None
 tickets = None
+relationFile = None
 if os.environ.get('SHOWCLOSED') and re.match(r'true', os.environ.get('SHOWCLOSED'), re.IGNORECASE):
     showClosed = True
 if os.environ.get('COLOR') and re.match(r'true', os.environ.get('COLOR'), re.IGNORECASE):
@@ -34,6 +35,8 @@ if os.environ.get('PROJECTS'):
     projects = list(map(int, os.environ.get('PROJECTS').rsplit(',')))
 if os.environ.get('TICKETS'):
     tickets = list(map(int, os.environ.get('TICKETS').rsplit(',')))
+if os.environ.get('RELATIONS'):
+    relationFile = os.environ.get('RELATIONS')
 
 trackers = {}
 status = {}
@@ -121,11 +124,41 @@ with open(sys.argv[1]) as csvDataFile:
             else:
                 d[pid] = [tid]
 
+
+relations = {}
+if relationFile:
+    with open(relationFile) as tsv_file:
+        tsv = csv.reader(tsv_file, delimiter="\t")
+        for row in tsv:
+            if not row[0] in relations.keys():
+                relations[row[0]] = []
+            if not row[2] in relations.keys():
+                relations[row[2]] = []
+            if row[1] == "relates":
+                relations[row[0]].append("-%s" % (row[2]))
+            elif row[1] == "blocks":
+                relations[row[0]].append("-o%s" % (row[2]))
+                relations[row[2]].append("o-%s" % (row[0]))
+            elif row[1] == "precedes":
+                relations[row[0]].append("->%s" % (row[2]))
+                relations[row[2]].append("<-%s" % (row[0]))
+            elif row[1] == "duplicates":
+                relations[row[0]].append("=%s" % (row[2]))
+    for rel in relations:
+        relations[rel] = ",".join(relations[rel])
+        if relations[rel] != "":
+            relations[rel] = "(%s) " % (relations[rel])
+            if showColor == True:
+                relations[rel] = fg(relations[rel], 37)
+
 # print(pjTopIds)
 # print(d)
 
 def show_ticket(tid, depth):
-    print("%s%d <%s|%s|%s|%s> %s" % ("  "*depth, tid, trackers[tid], status[tid], ratios[tid], prios[tid], subjects[tid]))
+    rel = ""
+    if str(tid) in relations.keys():
+        rel = relations[str(tid)]
+    print("%s%d <%s|%s|%s|%s> %s%s" % ("  "*depth, tid, trackers[tid], status[tid], ratios[tid], prios[tid], rel, subjects[tid]))
     if tid in d:
         for cid in d[tid]:
             show_ticket(cid, depth+1)
