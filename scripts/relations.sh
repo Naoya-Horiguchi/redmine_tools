@@ -118,7 +118,7 @@ generate_relation_json_from_draft() {
 }
 
 generate_relations_cache() {
-	jq -r '.issues[].relations[] | [.issue_id, .relation_type, .issue_to_id] | @tsv' $RM_CONFIG/issues.json | sort | uniq
+	jq -r '.issues[].relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @tsv' $RM_CONFIG/issues.json | sort | uniq
 }
 
 if [[ "$_" =~ bash ]] ; then

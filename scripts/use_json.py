@@ -150,6 +150,7 @@ if relationFile:
                 relations[row[2]] = []
             if row[1] == "relates":
                 relations[row[0]].append("-%s" % (row[2]))
+                relations[row[2]].append("-%s" % (row[0]))
             elif row[1] == "blocks":
                 relations[row[0]].append("-o%s" % (row[2]))
                 relations[row[2]].append("o-%s" % (row[0]))
@@ -157,11 +158,19 @@ if relationFile:
                 relations[row[0]].append("->%s" % (row[2]))
                 relations[row[2]].append("<-%s" % (row[0]))
             elif row[1] == "duplicates":
-                relations[row[0]].append("=%s" % (row[2]))
+                relations[row[0]].append("=>%s" % (row[2]))
+                relations[row[2]].append("<=%s" % (row[0]))
+            elif row[1] == "copied_to":
+                relations[row[0]].append("-c%s" % (row[2]))
+                relations[row[2]].append("c-%s" % (row[0]))
+            else:
+                print("unknown relation %s\n", row)
     for rel in relations:
         relations[rel] = ",".join(relations[rel])
         if relations[rel] != "":
-            relations[rel] = "(%s)" % (relations[rel])
+            relations[rel] = "(%s) " % (relations[rel])
+            if showColor == True:
+                relations[rel] = fg(relations[rel], 37)
 
 def take_updated_on(tid):
     return updateds[tid]

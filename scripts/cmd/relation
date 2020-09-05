@@ -1,0 +1,196 @@
+#!/bin/bash
+#
+# Usage
+#   redmine relation [option] <idspec> [...]
+#   redmine relation [option] -d <id|idspec> [...]
+#
+# Description
+#   ...
+#
+#   idspec is ...
+#
+# Options
+#   -d            delete relation
+#   -l            list relations
+#   -h            show this message
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+DELETE=
+LIST=
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-d)
+			DELETE=true
+			shift 1
+			;;
+		-l)
+			LIST=true
+			shift 1
+			;;
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			# echo "invalid option $key"
+			break
+			;;
+	esac
+done
+
+if [ ! "$@" ] && [ ! "$LIST" ] ; then
+	echo "no IDSPEC given."
+	show_help
+	exit 1
+fi
+
+update_local_cache > /dev/null 2>&1 || exit 1
+generate_relations_cache > $TMPDIR/relation.tsv
+
+get_relationship() {
+	local relation=$1
+
+	case $relation in
+		"->")
+			relation=precedes
+			;;
+		"<-")
+			relation=follows
+			;;
+		-o)
+			relation=blocks
+			;;
+		o-)
+			relation=blocked
+			;;
+		-c)
+			relation=copied_to
+			;;
+		c-)
+			relation=copied_from
+			;;
+		-)
+			relation=relates
+			;;
+		"=>")
+			relation=duplicates
+			;;
+		"<=")
+			relation=duplicated
+			;;
+	esac
+	echo $relation
+}
+
+get_reverse_relation() {
+	local relation=$1
+
+	case $relation in
+		precedes)
+			echo follows
+			;;
+		follows)
+			echo precedes
+			;;
+		blocks)
+			echo blocked
+			;;
+		blocked)
+			echo blocks
+			;;
+		copied_to)
+			echo copied_from
+			;;
+		copied_from)
+			echo copied_to
+			;;
+		relates)
+			echo relates
+			;;
+		duplicates)
+			echo duplicated
+			;;
+		duplicated)
+			echo duplicates
+			;;
+	esac
+}
+
+create_one_relation() {
+	local string=$1
+
+	local id1=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $1}')
+	local id2=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $2}')
+	local relation=$(echo $string | sed -e 's/[0-9]//g')
+	if [ ! "$id2" ] || [ ! "$relation" ] ; then
+		echo "invalid input: $string" >&2
+		show_help
+		return 1
+	fi
+
+	relation=$(get_relationship $relation)
+	echo "[$id1] => [$id2] $relation"
+	create_relation $id1 <(get_json_string "$id1" "$id2" relates)
+	update_local_cache_tasks $id1 $id2
+}
+
+update_local_cache_tasks() {
+	for id in $@ ; do
+		update_local_cache_task $id
+	done
+}
+
+delete_one_relation() {
+	local string=$1
+	local id1=
+	local id2=
+
+	if [[ "$string" =~ ^[0-9]+$ ]] ; then
+		# specified with notation
+		echo "deleting relation ID $string"
+		delete_relation $string
+		if [ $? -eq 0 ] ; then
+			id1=$(grep -P "\t${string}$" $TMPDIR/relation.tsv | cut -f1)
+			id2=$(grep -P "\t${string}$" $TMPDIR/relation.tsv | cut -f3)
+			update_local_cache_tasks $id1 $id2
+		fi
+	else
+		# specified with relation ID
+		echo "deleting relation \"$string\""
+
+		id1=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $1}')
+		id2=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $2}')
+		local relation=$(echo $string | sed -e 's/[0-9]//g')
+		relation=$(get_relationship $relation)
+
+		local rid=$(grep -P "^$id1\t$relation\t$id2" $TMPDIR/relation.tsv | cut -f4)
+		if [ ! "$rid" ] ; then
+			relation=$(get_reverse_relation $relation)
+			rid=$(grep -P "^$id2\t$relation\t$id1" $TMPDIR/relation.tsv | cut -f4)
+		fi
+
+		if [ "$rid" ] ; then
+			echo "delete_relation $rid ($string)"
+			delete_relation $rid
+			update_local_cache_tasks $id1 $id2
+		else
+			echo "failed to get relation ID of \"$string\""
+		fi
+	fi
+}
+
+if [ "$DELETE" = true ] ; then
+	for string in $@ ; do
+		delete_one_relation $string
+	done
+elif [ "$LIST" = true ] ; then
+	expand -t12 $TMPDIR/relation.tsv
+else
+	for string in $@ ; do
+		create_one_relation $string
+	done
+fi
