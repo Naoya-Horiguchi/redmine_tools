@@ -84,7 +84,6 @@ get_json_string() {
 	local issueid="$1"
 	local issuetoid="$2"
 	local reltype="$3"
-	# echo "{\"relation\": {\"issue_id\": $issueid, \"issue_to_id\": $issuetoid, \"relation_type\": \"$reltype\"}}"
 	echo "{\"relation\": {\"issue_to_id\": $issuetoid, \"relation_type\": \"$reltype\"}}"
 }
 
@@ -119,6 +118,133 @@ generate_relation_json_from_draft() {
 
 generate_relations_cache() {
 	jq -r '.issues[].relations[] | [.issue_id, .relation_type, .issue_to_id, .id] | @tsv' $RM_CONFIG/issues.json | sort | uniq
+}
+
+
+get_relationship() {
+	local relation=$1
+
+	case $relation in
+		"->")
+			relation=precedes
+			;;
+		"<-")
+			relation=follows
+			;;
+		-o)
+			relation=blocks
+			;;
+		o-)
+			relation=blocked
+			;;
+		-c)
+			relation=copied_to
+			;;
+		c-)
+			relation=copied_from
+			;;
+		-)
+			relation=relates
+			;;
+		"=>")
+			relation=duplicates
+			;;
+		"<=")
+			relation=duplicated
+			;;
+	esac
+	echo $relation
+}
+
+get_reverse_relation() {
+	local relation=$1
+
+	case $relation in
+		precedes)
+			echo follows
+			;;
+		follows)
+			echo precedes
+			;;
+		blocks)
+			echo blocked
+			;;
+		blocked)
+			echo blocks
+			;;
+		copied_to)
+			echo copied_from
+			;;
+		copied_from)
+			echo copied_to
+			;;
+		relates)
+			echo relates
+			;;
+		duplicates)
+			echo duplicated
+			;;
+		duplicated)
+			echo duplicates
+			;;
+	esac
+}
+
+create_one_relation() {
+	local string=$1
+
+	local id1=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $1}')
+	local id2=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $2}')
+	local relation=$(echo $string | sed -e 's/[0-9]//g')
+	if [ ! "$id2" ] || [ ! "$relation" ] ; then
+		echo "invalid input: $string" >&2
+		show_help
+		return 1
+	fi
+
+	relation=$(get_relationship $relation)
+	echo "[$id1] => [$id2] $relation"
+	create_relation $id1 <(get_json_string "$id1" "$id2" $relation)
+	update_local_cache_tasks $id1 $id2
+}
+
+delete_one_relation() {
+	local string=$1
+	local id1=
+	local id2=
+
+	if [[ "$string" =~ ^[0-9]+$ ]] ; then
+		# specified with notation
+		echo "deleting relation ID $string"
+		delete_relation $string
+		if [ $? -eq 0 ] ; then
+			id1=$(grep -P "\t${string}$" $TMPDIR/relation.tsv | cut -f1)
+			id2=$(grep -P "\t${string}$" $TMPDIR/relation.tsv | cut -f3)
+			update_local_cache_tasks $id1 $id2
+		fi
+	else
+		# specified with relation ID
+		echo "deleting relation \"$string\""
+
+		id1=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $1}')
+		id2=$(echo $string | sed -e 's/[^0-9]/ /g' | awk '{print $2}')
+		local relation=$(echo $string | sed -e 's/[0-9]//g')
+		relation=$(get_relationship $relation)
+
+		local rid=$(grep -P "^$id1\t$relation\t$id2" $TMPDIR/relation.tsv | cut -f4)
+		if [ ! "$rid" ] ; then
+			relation=$(get_reverse_relation $relation)
+			rid=$(grep -P "^$id2\t$relation\t$id1" $TMPDIR/relation.tsv | cut -f4)
+		fi
+
+		if [ "$rid" ] ; then
+			echo "delete_relation $rid ($string)"
+			delete_relation $rid
+			update_local_cache_tasks $id1 $id2
+		else
+			echo "failed to get relation ID of \"$string\""
+		fi
+	fi
 }
 
 if [[ "$_" =~ bash ]] ; then
