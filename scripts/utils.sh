@@ -466,9 +466,17 @@ update_local_cache_task() {
 
 	__curl "/issues.json" $TMPDIR/tmp.update_local_cache_task "&issue_id=$id&include=relations,attachments&status_id=*"
 	jq -r ".issues[]" $TMPDIR/tmp.update_local_cache_task > $TMPDIR/tmp.update_local_cache_task_new
+	# jq -r --slurpfile new_items $TMPDIR/tmp.update_local_cache_task_new \
+	#    '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json || return 1
 	jq -r --slurpfile new_items $TMPDIR/tmp.update_local_cache_task_new \
-	   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json || return 1
+	   '.issues |= map(select(.id == '$id') |= $new_items[0])' $RM_CONFIG/issues.json > $TMPDIR/tmp.issues.json || return 1
 	mv $TMPDIR/tmp.issues.json $RM_CONFIG/issues.json
+}
+
+update_local_cache_tasks() {
+	for id in $@ ; do
+		update_local_cache_task $id
+	done
 }
 
 remove_ticket_from_local_cache() {

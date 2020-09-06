@@ -119,6 +119,9 @@ case "$type" in
 	ti|tim|time)
 		show_time_entries
 		;;
+	task)
+		update_local_cache_task $2
+		;;
 	a|al|all)
 		echo "--- versions"
 		show_versions
