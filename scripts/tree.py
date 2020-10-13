@@ -76,11 +76,17 @@ with open(sys.argv[3]) as tracker_json:
         i += 1
         defaultTracker[tracker['name']] = tracker['default_status']['name']
 
+statusClosed = {}
+with open(sys.argv[4]) as status_json:
+    data = json.load(status_json)
+    for status in data['issue_statuses']:
+        statusClosed[status['name']] = status['is_closed']
+
 d = {}
 with open(sys.argv[1]) as csvDataFile:
     csvReader = csv.reader(csvDataFile)
     for row in csvReader:
-        if row[7] and showClosed == False:
+        if statusClosed[row[4]] and showClosed == False:
             continue
         pjid = int(row[1])
         tid = int(row[2])
@@ -88,7 +94,7 @@ with open(sys.argv[1]) as csvDataFile:
         ratios[tid] = int(row[5])
         prios[tid] = int(row[8])
         if showColor == True:
-            if row[7]:
+            if statusClosed[row[4]] == True:
                 status[tid] = fg(row[4], 238)
             elif row[4] == defaultTracker[trackers[tid]]:
                 status[tid] = fg(row[4], 200)

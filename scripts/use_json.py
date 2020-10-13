@@ -86,6 +86,12 @@ with open(sys.argv[3]) as tracker_json:
         i += 1
         defaultTracker[tracker['name']] = tracker['default_status']['name']
 
+statusClosed = {}
+with open(sys.argv[4]) as status_json:
+    data = json.load(status_json)
+    for status in data['issue_statuses']:
+        statusClosed[status['name']] = status['is_closed']
+
 with open(sys.argv[1]) as json_file:
     data = json.load(json_file)
     for p in data['issues']:
@@ -95,7 +101,7 @@ with open(sys.argv[1]) as json_file:
             pjIds[pjid] = []
         if not pjid in pjNames.keys():
             pjNames[pjid] = p['project']['name']
-        if 'closed_on' in p.keys() and p['closed_on'] and showClosed == False:
+        if statusClosed[p['status']['name']] == True and showClosed == False:
             continue
         if projects and not pjid in pjIncluded:
             continue
@@ -103,8 +109,8 @@ with open(sys.argv[1]) as json_file:
         globalIds.append(tid)
         subjects[tid] = p['subject']
         trackers[tid] = p['tracker']['name']
-        if ( 'closed_on' in p.keys() ):
-            closeds[tid] = p['closed_on']
+        if statusClosed[p['status']['name']] == True:
+            closeds[tid] = True
         else:
             closeds[tid] = None
         ratios[tid] = int(p['done_ratio'])
