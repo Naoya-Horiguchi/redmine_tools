@@ -129,22 +129,26 @@ with open(sys.argv[1]) as json_file:
                 ratios[tid] = fg(str(ratios[tid]), 48)
             else:
                 ratios[tid] = fg(str(ratios[tid]), 228)
-            if prios[tid] == 1:
-                prios[tid] = fg(str(prios[tid]), 8)
-            elif prios[tid] == 2:
-                prios[tid] = fg(str(prios[tid]), 4)
-            elif prios[tid] == 3:
-                prios[tid] = fg(str(prios[tid]), 2)
-            elif prios[tid] == 4:
-                prios[tid] = fg(str(prios[tid]), 3)
-            elif prios[tid] == 5:
-                prios[tid] = fg(str(prios[tid]), 1)
             trackers[tid] = fg(trackers[tid], trackerColor[trackers[tid]])
         else:
             status[tid] = p['status']['name']
             ratios[tid] = str(ratios[tid])
         updateds[tid] = p['updated_on']
         pjs[tid] = pjid
+
+def priority_color(prio):
+    if showColor != True:
+        return prio
+    if prio == 1:
+        return fg(str(prio), 8)
+    elif prio == 2:
+        return fg(str(prio), 4)
+    elif prio == 3:
+        return fg(str(prio), 2)
+    elif prio == 4:
+        return fg(str(prio), 3)
+    elif prio == 5:
+        return fg(str(prio), 1)
 
 relations = {}
 if relationFile:
@@ -180,7 +184,7 @@ if relationFile:
                 relations[rel] = fg(relations[rel], 37)
 
 def take_updated_on(tid):
-    return updateds[tid]
+    return (prios[tid], updateds[tid])
 
 def show_project(pj):
     print("PJ%d %s" % (pj, pjNames[pj]))
@@ -194,9 +198,9 @@ def show_ticket(tid, showPj):
     if str(tid) in relations.keys():
         rel = relations[str(tid)]
     if showPj:
-        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, rel, subjects[tid]))
+        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
     else:
-        print("%s\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], prios[tid], tid, rel, subjects[tid]))
+        print("%s\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
 
 if not grouping:
     sorted_tids = sorted(globalIds, key=take_updated_on)
