@@ -1056,3 +1056,9 @@ if [ ! "$RM_BASEURL" ] ; then
 	echo you need setup RM_BASEURL/RM_KEY
 	exit 1
 fi
+
+[ "$DEBUG" ] && set -x
+
+if [ "$RM_INSECURE" ] ; then
+	INSECURE=true
+fi

@@ -90,7 +90,8 @@ statusClosed = {}
 with open(sys.argv[4]) as status_json:
     data = json.load(status_json)
     for status in data['issue_statuses']:
-        statusClosed[status['name']] = status['is_closed']
+        if 'is_closed' in status:
+            statusClosed[status['name']] = status['is_closed']
 
 with open(sys.argv[1]) as json_file:
     data = json.load(json_file)
@@ -101,7 +102,7 @@ with open(sys.argv[1]) as json_file:
             pjIds[pjid] = []
         if not pjid in pjNames.keys():
             pjNames[pjid] = p['project']['name']
-        if statusClosed[p['status']['name']] == True and showClosed == False:
+        if p['status']['name'] in statusClosed and statusClosed[p['status']['name']] == True and showClosed == False:
             continue
         if projects and not pjid in pjIncluded:
             continue
@@ -109,7 +110,7 @@ with open(sys.argv[1]) as json_file:
         globalIds.append(tid)
         subjects[tid] = p['subject']
         trackers[tid] = p['tracker']['name']
-        if statusClosed[p['status']['name']] == True:
+        if p['status']['name'] in statusClosed and statusClosed[p['status']['name']] == True:
             closeds[tid] = True
         else:
             closeds[tid] = None
