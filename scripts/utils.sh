@@ -31,6 +31,12 @@ __update_ticket() {
 	local subject="$(grep -i ^#\+subject: $file | sed 's|^#+subject: *||i')"
 	local issue="$(grep -i ^#\+issue: $file | sed 's|^#+issue: *||i')"
 	[ ! "$issue" ] && issue=$issueid
+	local start_date="$(grep -i ^#\+startdate: $file | sed 's|^#+startdate: *||i')"
+	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
+	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
+	local before_done_ratio=$(jq -r ".issues[].done_ratio" $TMPDIR/tmp.before_edit)
+	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
+
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
 	local project_id="$(pjspec_to_pjid "$project")"
 	local tracker="$(grep -i ^#\+tracker: $file | sed 's|^#+tracker: *||i')"
@@ -51,9 +57,6 @@ __update_ticket() {
 			local assigned_id="$(userspec_to_userid "$assigned")"
 		fi
 	fi
-	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
-	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
-	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
 
 	# local version="$(grep -i ^#\+version: $file | sed 's|^#+version: *||i')"
 	# TODO: input in string format "<project> - <version>" is not supported yet.
@@ -104,13 +107,27 @@ __update_ticket() {
 	if [ "$estimate" ] && [ "$estimate" != "None" ] ; then
 		json_add_int $outjson .issue.estimated_hours $estimate || return 1
 	fi
-	# (2019/10/25 08:22) TODO 修正まで触らない
+
+	if [ "$start_date" ] ; then
+		if [ "$start_date" == "null" ] || [ "$start_date" == "None" ] ; then
+			json_add_text $outjson .issue.start_date "" || return 1
+		elif echo "$start_date" | grep -q "^-\?[0-9]\+$" ; then # relative date
+			local date_text="$(date -d "today $start_date days" +%Y-%m-%d)"
+			json_add_text $outjson .issue.start_date "$date_text" || return 1
+		else
+			local date_text="$(date -d "$start_date" +%Y-%m-%d)"
+			json_add_text $outjson .issue.start_date "$date_text" || return 1
+		fi
+	fi
 	if [ "$due_date" ] ; then
-		if [ "$due_date" != "null" ] && [ "$due_date" != "None" ] ; then
-			local date_text="$(date -d "$due_date" +%Y-%m-%d)"
+		if [ "$due_date" == "null" ] || [ "$due_date" == "None" ] ; then
+			json_add_text $outjson .issue.due_date "" || return 1
+		elif echo "$due_date" | grep -q "^-\?[0-9]\+$" ; then # relative date
+			local date_text="$(date -d "today $due_date days" +%Y-%m-%d)"
 			json_add_text $outjson .issue.due_date "$date_text" || return 1
 		else
-			json_add_text $outjson .issue.due_date "" || return 1
+			local date_text="$(date -d "$due_date" +%Y-%m-%d)"
+			json_add_text $outjson .issue.due_date "$date_text" || return 1
 		fi
 	fi
 	# category
@@ -244,6 +261,7 @@ __format_to_draft() {
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $tmpfile
 	# (2019/10/25 08:21) TODO なんか壊れているので修正されるまで触らないことにする。
+	echo "#+StartDate: $(jq -r .start_date $tmpjson)" >> $tmpfile
 	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $tmpfile
 	echo "#+TimeEntry: 0" >> $tmpfile
 	# echo "#+Version: $(jq -r .fixed_version.id $tmpjson)" >> $tmpfile
@@ -672,6 +690,7 @@ convert_to_draft_from_json() {
 		echo "#+Assigned: $(jq -r .assigned_to.name $tmpjson)" >> $draft
 	fi
 	echo "#+Estimate: $(jq -r .estimated_hours $tmpjson)" >> $draft
+	echo "#+StartDate: $(jq -r .start_date $tmpjson)" >> $draft
 	echo "#+DueDate: $(jq -r .due_date $tmpjson)" >> $draft
 	echo "#+TimeEntry: 0" >> $draft
 	# echo "#+Category: $(jq -r .fixed_version.id $tmpjson)" >> $draft
@@ -872,6 +891,7 @@ generate_issue_template() {
 	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
 	echo "#+Estimate: 1" >> $tmpfile
+	echo "#+StartDate: null" >> $tmpfile
 	echo "#+DueDate: null" >> $tmpfile
 	echo "#+TimeEntry: 0" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile

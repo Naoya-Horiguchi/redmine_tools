@@ -47,6 +47,8 @@ if 'assigned_to' in issue.keys():
     print("#+Assigned: %s" % issue['assigned_to']['name'])
 if 'estimated_hours' in issue.keys():
     print("#+Estimate: %s" % issue['estimated_hours'])
+if 'start_date' in issue.keys():
+    print("#+StartDate: %s" % issue['start_date'])
 if 'due_date' in issue.keys():
     print("#+DueDate: %s" % issue['due_date'])
 
