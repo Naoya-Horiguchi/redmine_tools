@@ -48,3 +48,4 @@ fi
 
 generate_issue_template || exit 1
 update_new_issue
+update_local_cache > /dev/null 2>&1 || exit 1
