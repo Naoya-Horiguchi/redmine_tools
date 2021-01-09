@@ -44,8 +44,36 @@ __update_ticket() {
 	# local category="$(grep -i ^#\+category: $file | sed 's|^#+category: *||i')"
 	# local category_id="$(categoryspec_to_categoryid "$category")"
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
+	# 状態が「未着手」か「クローズ」のときに done_ratio を 1~99 に変更したとき、状態を進行中にする
+	if [ "$RM_RULE_OPEN_DONE_RATIO" ] ; then
+		if ( [ "$before_done_ratio" -eq 0 ] || [ "$before_done_ratio" -eq 100 ] ) &&
+			   ( [ "$done_ratio" -gt 0 ] && [ "$done_ratio" -lt 100 ] ) ; then
+			status="$RM_RULE_OPEN_DONE_RATIO"
+		fi
+	fi
+	# done_ratio が <100 から 100 に変更されたときに状態を終了状態にする。
+	if [ "$RM_RULE_CLOSE_DONE_RATIO" ] ; then
+		if [ "$before_done_ratio" -lt 100 ] && [ "$done_ratio" -eq 100 ] ; then
+			status="$RM_RULE_CLOSE_DONE_RATIO"
+		fi
+	fi
+	# New から別の状態に変更したときに start_date が未設定なときについでに設定する
+	if [ "$RM_RULE_OPEN_AUTO_START_DATE" ] ; then
+		local before_status=$(jq -r ".issues[].status.name" $TMPDIR/tmp.before_edit)
+		if [ "$before_status" == "$RM_RULE_OPEN_AUTO_START_DATE" ] && [ "$before_status" != "$status" ] ; then
+			if [ "$start_date" == "null" ] || [ "$start_date" == "None" ] ; then
+				start_date=$(date -I)
+			fi
+		fi
+	fi
 	local status_id="$(statusspec_to_statusid "$status")"
 	local priority="$(grep -i ^#\+priority: $file | sed 's|^#+priority: *||i')"
+	# チケットクローズ時に priority が高く設定されていた場合、デフォルトに戻す。
+	if [ "$RM_RULE_CLOSE_CLEAR_PRIORITY" ] ; then
+		if status_closed "$status" ; then
+			priority="$RM_RULE_CLOSE_CLEAR_PRIORITY"
+		fi
+	fi
 	local priority_id="$(priorityspec_to_priorityid "$priority")"
 	local parent_id="$(grep -i ^#\+parentissue: $file | sed 's|^#+parentissue: *||i')"
 	# TODO: user name/id どちらでも登録できるようにしたい
