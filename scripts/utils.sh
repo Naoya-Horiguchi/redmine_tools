@@ -33,9 +33,9 @@ __update_ticket() {
 	[ ! "$issue" ] && issue=$issueid
 	local start_date="$(grep -i ^#\+startdate: $file | sed 's|^#+startdate: *||i')"
 	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
+
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
 	local before_done_ratio=$(jq -r ".issues[].done_ratio" $TMPDIR/tmp.before_edit)
-	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
 	local project_id="$(pjspec_to_pjid "$project")"
@@ -66,6 +66,19 @@ __update_ticket() {
 			fi
 		fi
 	fi
+
+	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
+	# auto update is enabled only when already started.
+	if [ "$done_ratio" -gt 0 ] && [ "$estimate" != "None" ] && ! status_closed "$status" ; then
+		local spenthour=$(jq -r '[.time_entries[] | select(.issue.id == '$issueid') | .hours * 100] | add | floor/100' $RM_CONFIG/time_entries.json)
+		if [ $(echo "$estimate < $spenthour" | bc) -eq 1 ] ; then
+			echo "spent hours more than expected. extend estimate."
+			estimate=$[estimate * 2]
+		fi
+		done_ratio=$(echo "100 * $spenthour / $estimate" | bc)
+		echo "auto generated done_ratio is $done_ratio"
+	fi
+
 	local status_id="$(statusspec_to_statusid "$status")"
 	local priority="$(grep -i ^#\+priority: $file | sed 's|^#+priority: *||i')"
 	# チケットクローズ時に priority が高く設定されていた場合、デフォルトに戻す。
@@ -215,6 +228,7 @@ __curl_limit() {
 	local out="$2"
 	local data="$3"
 	local limit="$4"
+	local key="$5"
 	local step=100
 
 	local requestbase="$RM_BASEURL${api}?key=${RM_KEY}"
@@ -231,8 +245,8 @@ __curl_limit() {
 		files="$files $tmpd/page.$i.json"
 	done
 
-	jq 'reduce inputs as $i (.; .issues += $i.issues)' $files > $out
-	rm -rf $tmpd
+	jq 'reduce inputs as $i (.; .'$key' += $i.'$key')' $files > $out
+	# rm -rf $tmpd
 }
 
 __curl() {
@@ -485,7 +499,7 @@ update_local_cache() {
 	local data="${ASSIGNED_OPT}&status_id=*&include=relations,attachments&sort=updated_on:desc"
 
 	if [ -s "$RM_LAST_DOWNLOAD" ] ; then
-		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 || return 1
+		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 issues || return 1
 		jq -r ".issues[]" $RM_CONFIG/tmp.issues.json > $RM_CONFIG/tmp.new_items
 		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.issues.json)"
 		if [ "$total_count" -gt 0 ] ; then
@@ -497,7 +511,7 @@ update_local_cache() {
 			echo "local cache is up-to-date" >&2
 		fi
 	else
-		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 || return 1
+		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 issues || return 1
 		date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 	fi
 }
@@ -543,10 +557,10 @@ remove_ticket_from_local_cache() {
 RM_LAST_DOWNLOAD_TE=$RM_CONFIG/tmp.last_download_time_entry
 
 update_local_cache_time_entries() {
-	local data="${ASSIGNED_OPT}&status_id=*&include=relations&sort=updated_on:desc"
+	local data=""
 
 	if [ -s "$RM_LAST_DOWNLOAD_TE" ] ; then
-		__curl_limit "/time_entries.json" $RM_CONFIG/tmp.time_entries.json "$data&from=$(cat $RM_LAST_DOWNLOAD_TE)" 10000 || return 1
+		__curl_limit "/time_entries.json" $RM_CONFIG/tmp.time_entries.json "$data&from=$(cat $RM_LAST_DOWNLOAD_TE)" 10000 time_entries || return 1
 		jq -r ".time_entries[]" $RM_CONFIG/tmp.time_entries.json > $RM_CONFIG/tmp.new_time_entries
 		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.time_entries.json)"
 		if [ "$total_count" -gt 0 ] ; then
@@ -557,7 +571,7 @@ update_local_cache_time_entries() {
 			echo "local cache is up-to-date" >&2
 		fi
 	else
-		__curl_limit "/time_entries.json" $RM_CONFIG/time_entries.json "$data" 10000 || return 1
+		__curl_limit "/time_entries.json" $RM_CONFIG/time_entries.json "$data" 10000 time_entries || return 1
 	fi
 	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD_TE
 }
@@ -857,6 +871,7 @@ update_issue3() {
 		[[ "$issueid" =~ ^L ]] && break
 		__curl "/issues.json" $TMPDIR/tmp.after_edit "&issue_id=$issueid&include=relations&status_id=*"
 		if cmp --silent $TMPDIR/tmp.before_edit $TMPDIR/tmp.after_edit ; then
+			[ "$RM_SAVE_CLOCK" ] && __close_clock $issueid
 			upload_ticket $draft $issueid $TMPDIR/tmp.upload.json
 			if [ $? -eq 0 ] ; then
 				update_relations3 $issueid ${draft}.edit.diff
@@ -887,7 +902,6 @@ update_issue3() {
 			fi
 		fi
 	done
-	[ "$RM_SAVE_CLOCK" ] && __close_clock $issueid
 }
 
 generate_issue_template() {
