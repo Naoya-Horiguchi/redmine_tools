@@ -100,6 +100,10 @@ while [[ $# -gt 0 ]] ; do
 			EDITOR="$2"
 			shift 2
 			;;
+		-v)
+			set -x
+			shift 1
+			;;
 		--insecure)
 			INSECURE=true
 			shift 1
