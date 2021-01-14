@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# Usage
+#   redmine sanitize [options] [ticket_id]
+#
+# Description
+#
+# Options
+#   -h            show this message
+#   -u            update issues (only check by default)
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+UPDATEISSUES=
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		-r)
+			UPDATEISSUES=true
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+ISSUEID=$1
+[ ! "$ISSUEID" ] && show_help && exit 1
+
+update_local_cache > /dev/null 2>&1 || exit 1
+
+python3 $THISDIR/check_issue.py $ISSUEID
