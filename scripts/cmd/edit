@@ -86,5 +86,6 @@ else
 	update_local_cache_task $ISSUEID || exit 1
 	! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
+	[ "$STY" ] && printf $'\033k'RM#$ISSUEID\(proj\)$'\033'\\
 	update_issue3 $ISSUEID
 fi
