@@ -49,4 +49,6 @@ if [ "$RM_CHANGE_DIRECTORY" == true ] ; then
 			bash $thisdir/scripts/main.sh $@
 		fi
 	}
+else
+	alias redmine=$(readlink -f $(dirname $BASH_SOURCE))/scripts/main.sh
 fi
