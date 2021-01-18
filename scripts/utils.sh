@@ -69,14 +69,26 @@ __update_ticket() {
 
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# auto update is enabled only when already started.
-	if [ "$done_ratio" -gt 0 ] && [ "$estimate" != "None" ] && ! status_closed "$status" ; then
+	if [ "$RM_RULE_AUTO_UPDATE_DONE_RATIO" ] ; then
+	if [ "$done_ratio" -gt 0 ] && [ "$estimate" != "None" ] && [ $(echo "$estimate > 0.0" | bc) -eq 1 ] && ! status_closed "$status" ; then
 		local spenthour=$(jq -r '[.time_entries[] | select(.issue.id == '$issueid') | .hours * 100] | add | floor/100' $RM_CONFIG/time_entries.json)
-		if [ $(echo "$estimate < $spenthour" | bc) -eq 1 ] ; then
-			echo "spent hours more than expected. extend estimate."
-			estimate=$[estimate * 2]
+		if [ "$spenthour" ] ; then
+			if [ $(echo "$estimate < $spenthour" | bc) -eq 1 ] ; then
+				echo "spent hours more than expected. extend estimate."
+				for i in $(seq 0 16) ; do
+					if [ $(echo "$spenthour < $[1 << i]" | bc) -eq 1 ] ; then
+						estimate=$[1 << i]
+						break
+					fi
+				done
+			fi
+			done_ratio=$(echo "100 * $spenthour / $estimate" | bc)
+			echo "auto generated done_ratio is $done_ratio ($spenthour/$estimate)"
+			# somehow failed to update estimate, so no change.
+			[ $(echo "$done_ratio >= 100" | bc) -eq 1 ] && done_ratio=
+			[ $(echo "$done_ratio <= 0" | bc) -eq 1 ] && done_ratio=
 		fi
-		done_ratio=$(echo "100 * $spenthour / $estimate" | bc)
-		echo "auto generated done_ratio is $done_ratio"
+	fi
 	fi
 
 	local status_id="$(statusspec_to_statusid "$status")"
@@ -333,6 +345,10 @@ check_issue_exist() {
 __check_opened() {
 	local issueid=$1
 
+	if [ ! "$RM_SAVE_CLOCK" ] ; then
+		return 0
+	fi
+
 	if [ ! -s "$TMPD/$issueid/.clock.log" ] ; then
 		# echo "first open"
 		return 0
@@ -361,11 +377,15 @@ __open_clock() {
 __create_time_entry() {
 	local issueid="$1"
 
-	local record="$(tail -n1 $TMPD/$issueid/.clock.log)"
-	local cin=$(echo $record | cut -f1 -d' ')
-	local cout=$(echo $record | cut -f2 -d' ')
-	local tin=$(date -d $cin +%s 2> /dev/null)
-	local tout=$(date -d $cout +%s 2> /dev/null)
+	# local record="$(tail -n1 $TMPD/$issueid/.clock.log)"
+	# local cin=$(echo $record | cut -f1 -d' ')
+	# local cout=$(echo $record | cut -f2 -d' ')
+	# local tin=$(date -d $cin +%s 2> /dev/null)
+	# local tout=$(date -d $cout +%s 2> /dev/null)
+	# local clock=$[$tout - $tin]
+
+	local tin=$(date -d $TIMESTAMP +%s 2> /dev/null)
+	local tout=$(date +%s 2> /dev/null)
 	local clock=$[$tout - $tin]
 
 	# time_entry explicitly given in draft file.
@@ -392,10 +412,15 @@ __create_time_entry() {
 
 __close_clock() {
 	local issueid=$1
+
+	__create_time_entry $issueid
+	sleep 0.5
+	update_local_cache_time_entries
+
+	[ ! "$RM_SAVE_CLOCK" ] && return
 	trap 2
 	perl -pi -e 'chomp if eof' "$TMPD/$issueid/.clock.log"
 	echo "$(date --iso-8601=seconds)" >> $TMPD/$issueid/.clock.log
-	__create_time_entry $issueid
 }
 
 calc_clock_hour() {
@@ -761,35 +786,36 @@ ask_done_ratio_update3() {
 	diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
 	if [ -s ${draft}.edit.diff ] && ! grep -q -i "^+#+doneratio:" ${draft}.edit.diff ; then
 		[ "$done_ratio" -eq 100 ] && return
-		echo -n "Update DoneRatio from $done_ratio? (0-100 or Enter): "
-		read input
-		if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
-			sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $draft
+		if [ ! "$RM_RULE_AUTO_UPDATE_DONE_RATIO" ] ; then
+			echo -n "Update DoneRatio from $done_ratio? (0-100 or Enter): "
+			read input
+			if [ "$input" ] && [ "$input" -ge 0 ] && [ "$input" -le 100 ] ; then
+				sed -i "s/^#+doneratio:.*/#+DoneRatio: $input/i" $draft
+			fi
 		fi
-
-		# TODO: Status change caused by done_ratio update
 	fi
 }
 
 edit_issue3() {
 	local issueid="$1"
 	local draft="$2"
+	local input=
 
 	while true ; do
+		input=
 		pushd $(dirname $draft)
 		$EDITOR $draft
 		popd
 		ask_done_ratio_update3
 		diff -u ${draft}.before_edit $draft > ${draft}.edit.diff
 		if [ ! "$NO_DOWNLOAD" ] && [ ! -s "${draft}.edit.diff" ] ; then
-			echo "no diff, so no need to upload"
-			return 1
+			input=y
+		else
+			cat ${draft}.edit.diff
+			echo
+			echo -n "You really upload this change? (y/Y: yes, n/N: no, s/S: save draft, e/E: edit again): "
+			read input
 		fi
-		[[ "$issueid" =~ ^L ]] && return 0
-		cat ${draft}.edit.diff
-		echo
-		echo -n "You really upload this change? (y/Y: yes, n/N: no, s/S: save draft, e/E: edit again): "
-		read input
 		if [ "$input" == y ] || [ "$input" == Y ] ; then
 			return 0
 		elif [ "$input" == n ] || [ "$input" == N ] ; then
@@ -870,8 +896,8 @@ update_issue3() {
 		edit_issue3 $issueid $draft || break
 		[[ "$issueid" =~ ^L ]] && break
 		__curl "/issues.json" $TMPDIR/tmp.after_edit "&issue_id=$issueid&include=relations&status_id=*"
+		__close_clock $issueid
 		if cmp --silent $TMPDIR/tmp.before_edit $TMPDIR/tmp.after_edit ; then
-			[ "$RM_SAVE_CLOCK" ] && __close_clock $issueid
 			upload_ticket $draft $issueid $TMPDIR/tmp.upload.json
 			if [ $? -eq 0 ] ; then
 				update_relations3 $issueid ${draft}.edit.diff

@@ -58,7 +58,8 @@
 #   - implement "report" command to construct report from given set of ticket
 #
 
-TSTAMP=$(date +%y%m%d_%H%M%S)
+TIMESTAMP=$(date -Iseconds)
+TSTAMP=$(date -d $TIMESTAMP  +%y%m%d_%H%M%S)
 TMPDIR=/tmp/redmine_cli/$TSTAMP
 mkdir -p /tmp/redmine_cli/$TSTAMP
 echo "redmine $*" > $TMPDIR/cmd
