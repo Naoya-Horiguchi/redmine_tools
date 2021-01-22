@@ -137,7 +137,7 @@ edit_tree() {
 	update_local_cache
 }
 
-update_local_cache > /dev/null 2>&1 || exit 1
+update_local_cache || exit 1
 RELATIONFILE=$TMPDIR/relation.tsv
 generate_relations_cache > $RELATIONFILE
 
