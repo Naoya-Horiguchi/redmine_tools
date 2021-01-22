@@ -45,14 +45,14 @@ __update_ticket() {
 	# local category_id="$(categoryspec_to_categoryid "$category")"
 	local status="$(grep -i ^#\+status: $file | sed 's|^#+status: *||i')"
 	# 状態が「未着手」か「クローズ」のときに done_ratio を 1~99 に変更したとき、状態を進行中にする
-	if [ "$RM_RULE_OPEN_DONE_RATIO" ] ; then
+	if [ "$RM_RULE_OPEN_DONE_RATIO" ] && [ "$before_done_ratio" ] ; then
 		if ( [ "$before_done_ratio" -eq 0 ] || [ "$before_done_ratio" -eq 100 ] ) &&
 			   ( [ "$done_ratio" -gt 0 ] && [ "$done_ratio" -lt 100 ] ) ; then
 			status="$RM_RULE_OPEN_DONE_RATIO"
 		fi
 	fi
 	# done_ratio が <100 から 100 に変更されたときに状態を終了状態にする。
-	if [ "$RM_RULE_CLOSE_DONE_RATIO" ] ; then
+	if [ "$RM_RULE_CLOSE_DONE_RATIO" ] && [ "$before_done_ratio" ] ; then
 		if [ "$before_done_ratio" -lt 100 ] && [ "$done_ratio" -eq 100 ] ; then
 			status="$RM_RULE_CLOSE_DONE_RATIO"
 		fi
@@ -70,7 +70,8 @@ __update_ticket() {
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# auto update is enabled only when already started.
 	if [ "$RM_RULE_AUTO_UPDATE_DONE_RATIO" ] ; then
-	if [ "$done_ratio" -gt 0 ] && [ "$estimate" != "None" ] && [ $(echo "$estimate > 0.0" | bc) -eq 1 ] && ! status_closed "$status" ; then
+	# TODO: (status is open) or (done_ratio > 0)
+	if [ "$estimate" != "None" ] && [ $(echo "$estimate > 0.0" | bc) -eq 1 ] && ! status_closed "$status" ; then
 		local spenthour=$(jq -r '[.time_entries[] | select(.issue.id == '$issueid') | .hours * 100] | add | floor/100' $RM_CONFIG/time_entries.json)
 		if [ "$spenthour" ] ; then
 			if [ $(echo "$estimate < $spenthour" | bc) -eq 1 ] ; then
