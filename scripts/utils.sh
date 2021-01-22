@@ -8,8 +8,8 @@ json_add_text() {
 	local position="$2"
 	local text="$3"
 
-	cp $file $RM_CONFIG/tmp.json
-	jq --arg text "$text" $position='$text' $RM_CONFIG/tmp.json > $file
+	cp $file $TMPDIR/tmp.json
+	jq --arg text "$text" $position='$text' $TMPDIR/tmp.json > $file
 }
 
 json_add_int() {
@@ -17,8 +17,8 @@ json_add_int() {
 	local position="$2"
 	local int="$3"
 
-	cp $file $RM_CONFIG/tmp.json
-	jq $position=$int $RM_CONFIG/tmp.json > $file
+	cp $file $TMPDIR/tmp.json
+	jq $position=$int $TMPDIR/tmp.json > $file
 }
 
 __update_ticket() {
@@ -441,7 +441,7 @@ create_time_entry() {
 	local spenton="$3"
 	local activity="$4"
 	local comment="$5"
-	local outjson=$TMPD/$issueid/create_time_entry.json
+	local outjson=$TMPDIR/create_time_entry.json
 
 	echo "{\"time_entry\": {}}" > $outjson
 	json_add_int $outjson .time_entry.issue_id "$issueid" || return 1
