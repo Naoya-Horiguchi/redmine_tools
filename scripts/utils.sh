@@ -518,26 +518,23 @@ get_local_ticket_list() {
 	ls -1 $RM_CONFIG/edit_memo | grep ^L
 }
 
-RM_LAST_DOWNLOAD=$RM_CONFIG/tmp.last_download
-
 update_local_cache() {
 	local data="${ASSIGNED_OPT}&status_id=*&include=relations,attachments&sort=updated_on:desc"
 
-	if [ -s "$RM_LAST_DOWNLOAD" ] ; then
-		__curl_limit "/issues.json" $RM_CONFIG/tmp.issues.json "$data&updated_on=>=$(cat $RM_LAST_DOWNLOAD)" 10000 issues || return 1
-		jq -r ".issues[]" $RM_CONFIG/tmp.issues.json > $RM_CONFIG/tmp.new_items
-		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.issues.json)"
+	if [ -s "$RM_CONFIG/issues.json" ] ; then
+		local latest="$(jq -r '[.issues[] | .updated_on] | max' $RM_CONFIG/issues.json)"
+		__curl_limit "/issues.json" $TMPDIR/tmp.issues.json "$data&updated_on=>=$latest" 10000 issues || return 1
+		jq -r ".issues[]" $TMPDIR/tmp.issues.json > $TMPDIR/tmp.new_items
+		total_count="$(jq -r '.total_count' $TMPDIR/tmp.issues.json)"
 		if [ "$total_count" -gt 0 ] ; then
-			jq -r --slurpfile new_items $RM_CONFIG/tmp.new_items \
-			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $RM_CONFIG/issues.json.tmp || return 1
-			mv $RM_CONFIG/issues.json.tmp $RM_CONFIG/issues.json
-			date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
+			jq -r --slurpfile new_items $TMPDIR/tmp.new_items \
+			   '.issues |= [ . + $new_items | group_by(.id)[] | add ]' $RM_CONFIG/issues.json > $TMPDIR/issues.json.tmp || return 1
+			mv $TMPDIR/issues.json.tmp $RM_CONFIG/issues.json
 		else
 			echo "local cache is up-to-date" >&2
 		fi
 	else
 		__curl_limit "/issues.json" $RM_CONFIG/issues.json "$data" 10000 issues || return 1
-		date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD
 	fi
 }
 
@@ -579,26 +576,24 @@ remove_ticket_from_local_cache() {
 	fi
 }
 
-RM_LAST_DOWNLOAD_TE=$RM_CONFIG/tmp.last_download_time_entry
-
 update_local_cache_time_entries() {
 	local data=""
 
-	if [ -s "$RM_LAST_DOWNLOAD_TE" ] ; then
-		__curl_limit "/time_entries.json" $RM_CONFIG/tmp.time_entries.json "$data&from=$(cat $RM_LAST_DOWNLOAD_TE)" 10000 time_entries || return 1
-		jq -r ".time_entries[]" $RM_CONFIG/tmp.time_entries.json > $RM_CONFIG/tmp.new_time_entries
-		total_count="$(jq -r '.total_count' $RM_CONFIG/tmp.time_entries.json)"
+	if [ -s "$RM_CONFIG/time_entries.json" ] ; then
+		local latest="$(jq -r '[.time_entries[].spent_on] | max' $RM_CONFIG/time_entries.json)"
+		__curl_limit "/time_entries.json" $TMPDIR/tmp.time_entries.json "$data&from=$latest" 100000 time_entries || return 1
+		jq -r ".time_entries[]" $TMPDIR/tmp.time_entries.json > $TMPDIR/tmp.new_time_entries
+		total_count="$(jq -r '.total_count' $TMPDIR/tmp.time_entries.json)"
 		if [ "$total_count" -gt 0 ] ; then
-			jq -r --slurpfile new_time_entries $RM_CONFIG/tmp.new_time_entries \
-			   '.time_entries |= [ . + $new_time_entries | group_by(.id)[] | add ]' $RM_CONFIG/time_entries.json > $RM_CONFIG/time_entries.json.tmp || return 1
-			mv $RM_CONFIG/time_entries.json.tmp $RM_CONFIG/time_entries.json
+			jq -r --slurpfile new_time_entries $TMPDIR/tmp.new_time_entries \
+			   '.time_entries |= [ . + $new_time_entries | group_by(.id)[] | add ]' $RM_CONFIG/time_entries.json > $TMPDIR/time_entries.json.tmp || return 1
+			mv $TMPDIR/time_entries.json.tmp $RM_CONFIG/time_entries.json
 		else
-			echo "local cache is up-to-date" >&2
+			echo "local time_entry cache is up-to-date" >&2
 		fi
 	else
-		__curl_limit "/time_entries.json" $RM_CONFIG/time_entries.json "$data" 10000 time_entries || return 1
+		__curl_limit "/time_entries.json" $RM_CONFIG/time_entries.json "$data" 100000 time_entries || return 1
 	fi
-	date --utc +"%Y-%m-%dT%H:%M:%SZ" > $RM_LAST_DOWNLOAD_TE
 }
 
 declare -A SUBTASK_TABLE
