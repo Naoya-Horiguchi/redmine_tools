@@ -928,6 +928,15 @@ update_issue3() {
 	done
 }
 
+get_trackers_default_status() {
+	local status="$(jq -r '.trackers[] | select(.name == "'$1'") | .default_status.name' $RM_CONFIG/trackers.json)"
+	if [ ! "$status" ] ; then
+		echo New
+	else
+		echo "$status"
+	fi
+}
+
 generate_issue_template() {
 	local tmpfile=$TMPDIR/$RM_DRAFT_FILENAME
 	mkdir -p $(dirname $tmpfile)
@@ -947,9 +956,9 @@ generate_issue_template() {
 	echo "#+Project: " >> $tmpfile
 	echo "#+Subject: subject" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
-	echo "#+Tracker: " >> $tmpfile
+	echo "#+Tracker: $RM_DEFAULT_TRACKER" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
-	echo "#+Status: New" >> $tmpfile
+	echo "#+Status: $(get_trackers_default_status $RM_DEFAULT_TRACKER)" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
 	echo "#+ParentIssue: null" >> $tmpfile
 	if [ "$RM_USERLIST" ] ; then
