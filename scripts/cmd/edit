@@ -16,6 +16,18 @@
 #   -f <draft>    update ticket with given draft file
 #   -h            show this message
 #
+# Options for non-interactive update
+#   -s|--status
+#   --startdate
+#   -d|--duedate
+#   -e|--estimate
+#   -a|--assigned
+#   -S|--subject
+#   -p|--priority
+#   -P|--project
+#   --parent
+#   -t|--tracker
+#
 
 show_help() {
 	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
@@ -23,6 +35,7 @@ show_help() {
 
 REPLYNOTE=
 DRAFT=
+INTERACTIVE_EDIT=true
 
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -33,6 +46,56 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		-f)
 			DRAFT="$2"
+			shift 2
+			;;
+		-s|--status)
+			NEW_STATUS="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		--startdate)
+			NEW_STARTDATE="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-d|--duedate)
+			NEW_DUEDATE="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-e|--estimate)
+			NEW_ESTIMATE="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-a|--assigned)
+			NEW_ASSIGNED="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-S|--subject)
+			NEW_SUBJECT="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-p|--priority)
+			NEW_PRIORITY="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-P|--project)
+			NEW_PROJECT="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		--parent)
+			NEW_PARENTISSUE="$2"
+			INTERACTIVE_EDIT=false
+			shift 2
+			;;
+		-t|--tracker)
+			NEW_TRACKER="$2"
+			INTERACTIVE_EDIT=false
 			shift 2
 			;;
 		-h)
@@ -70,6 +133,37 @@ if [ "$DRAFT" ] ; then
 	fi
 	echo "update_issue failed, check draft.md and/or network connection."
 	exit 1
+elif [ "$INTERACTIVE_EDIT" == false ] ; then
+	if [ "$#" -gt 1 ] && [ "$NEW_SUBJECT" ] ; then
+		echo "Changing multiple issues to update Subject is warned." >&2
+		exit 1
+	fi
+
+	update_local_cache || exit 1
+
+	for issueid in $@ ; do
+		convert_to_draft_from_json $issueid $RM_CONFIG/issues.json $TMPDIR/draft.md
+
+		[ "$NEW_STATUS" ] && sed -i "s/^#+status:.*/#+Status: $NEW_STATUS/i" $TMPDIR/draft.md
+		[ "$NEW_STARTDATE" ] && sed -i "s/^#+startdate:.*/#+StartDate: $NEW_STARTDATE/i" $TMPDIR/draft.md
+		[ "$NEW_DUEDATE" ] && sed -i "s/^#+duedate:.*/#+DueDate: $NEW_DUEDATE/i" $TMPDIR/draft.md
+		[ "$NEW_ESTIMATE" ] && sed -i "s/^#+estimate:.*/#+Estimate: $NEW_ESTIMATE/i" $TMPDIR/draft.md
+		[ "$NEW_ASSIGNED" ] && sed -i "s/^#+assigned:.*/#+Assigned: $NEW_ASSIGNED/i" $TMPDIR/draft.md
+		[ "$NEW_SUBJECT" ] && sed -i "s/^#+subject:.*/#+Subject: $NEW_SUBJECT/i" $TMPDIR/draft.md
+		[ "$NEW_PRIORITY" ] && sed -i "s/^#+priority:.*/#+Priority: $NEW_PRIORITY/i" $TMPDIR/draft.md
+		[ "$NEW_PROJECT" ] && sed -i "s/^#+project:.*/#+Project: $NEW_PROJECT/i" $TMPDIR/draft.md
+		[ "$NEW_PARENTISSUE" ] && sed -i "s/^#+parentissue:.*/#+ParentIssue: $NEW_PARENTISSUE/i" $TMPDIR/draft.md
+		[ "$NEW_TRACKER" ] && sed -i "s/^#+tracker:.*/#+Tracker: $NEW_TRACKER/i" $TMPDIR/draft.md
+
+		cat $TMPDIR/draft.md
+
+		upload_ticket $TMPDIR/draft.md $issueid $TMPDIR/tmp.upload.json
+		if [ $? -ne 0 ] ; then
+			echo "updating issue $issueid failed."
+		fi
+	done
+
+	update_local_cache || exit 1
 else
 	ISSUEID=$1
 
