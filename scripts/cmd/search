@@ -41,7 +41,12 @@ done
 SCOPE=all
 
 urlencode() {
-	echo -n "$1" | nkf -WwMQ | sed 's/=$//g' | tr = % | tr -d '\n'
+	# On Git Bash in Windows we avoid dependency on nkf
+	if which nkf > /dev/null 2>&1 ; then
+		echo -n "$1" | nkf -WwMQ | sed 's/=$//g' | tr = % | tr -d '\n'
+	else
+		echo -n "$1" | sed 's/=$//g' | tr = % | tr -d '\n'
+	fi
 }
 
 get_url_string() {
