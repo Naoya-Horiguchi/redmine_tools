@@ -23,7 +23,7 @@ json_add_int() {
 
 __update_ticket() {
 	local file="$1"
-	local issueid="$2"
+	local issueid="$2"  # could be empty
 	local outjson="$3"
 
 	[ ! "$outjson" ] && outjson=$TMPD/$issue/upload.json
@@ -35,7 +35,7 @@ __update_ticket() {
 	local due_date="$(grep -i ^#\+duedate: $file | sed 's|^#+duedate: *||i')"
 
 	local done_ratio="$(grep -i ^#\+doneratio: $file | sed 's|^#+doneratio: *||i')"
-	local before_done_ratio=$(jq -r ".issues[].done_ratio" $TMPDIR/tmp.before_edit)
+	local before_done_ratio=$(jq -r ".issues[].done_ratio" $TMPDIR/tmp.before_edit 2> /dev/null)
 
 	local project="$(grep -i ^#\+project: $file | sed 's|^#+project: *||i')"
 	local project_id="$(pjspec_to_pjid "$project")"
@@ -59,7 +59,7 @@ __update_ticket() {
 	fi
 	# New から別の状態に変更したときに start_date が未設定なときについでに設定する
 	if [ "$RM_RULE_OPEN_AUTO_START_DATE" ] ; then
-		local before_status=$(jq -r ".issues[].status.name" $TMPDIR/tmp.before_edit)
+		local before_status=$(jq -r ".issues[].status.name" $TMPDIR/tmp.before_edit 2> /dev/null)
 		if [ "$before_status" == "$RM_RULE_OPEN_AUTO_START_DATE" ] && [ "$before_status" != "$status" ] ; then
 			if [ "$start_date" == "null" ] || [ "$start_date" == "None" ] ; then
 				start_date=$(date -I)
@@ -69,7 +69,7 @@ __update_ticket() {
 
 	local estimate="$(grep -i ^#\+estimate: $file | sed 's|^#+estimate: *||i')"
 	# auto update is enabled only when already started.
-	if [ "$RM_RULE_AUTO_UPDATE_DONE_RATIO" ] ; then
+	if [ "$issueid" ] && [ "$RM_RULE_AUTO_UPDATE_DONE_RATIO" ] ; then
 	# TODO: (status is open) or (done_ratio > 0)
 	if [ "$estimate" != "None" ] && [ $(echo "$estimate > 0.0" | bc) -eq 1 ] && ! status_closed "$status" ; then
 		local spenthour=$(jq -r '[.time_entries[] | select(.issue.id == '$issueid') | .hours * 100] | add | floor/100' $RM_CONFIG/time_entries.json)
@@ -247,6 +247,7 @@ __curl_limit() {
 	local requestbase="$RM_BASEURL${api}?key=${RM_KEY}"
 	local totalcount=$(curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}" | jq .total_count)
 	[ ! "$totalcount" ] && return 1
+	[ "$totalcount" == "null" ] && return 1
 	[ "$limit" -gt "$totalcount" ] && limit=$totalcount
 	local pages=$[($limit - 1) / $step + 1]
 	[ ! "$totalcount" ] && return 1
@@ -524,6 +525,8 @@ update_local_cache() {
 
 	if [ -s "$RM_CONFIG/issues.json" ] ; then
 		local latest="$(jq -r '[.issues[] | .updated_on] | max' $RM_CONFIG/issues.json)"
+		# convert to UTC
+		latest="$(date -d "$latest" -u +"%Y-%m-%dT%H:%M:%SZ")"
 		__curl_limit "/issues.json" $TMPDIR/tmp.issues.json "$data&updated_on=>=$latest" 10000 issues || return 1
 		jq -r ".issues[]" $TMPDIR/tmp.issues.json > $TMPDIR/tmp.new_items
 		total_count="$(jq -r '.total_count' $TMPDIR/tmp.issues.json)"
@@ -882,7 +885,6 @@ update_issue3() {
 		cp $draft ${draft}.before_edit
 	fi
 
-
 	[ "$RM_SAVE_CLOCK" ] && __open_clock $issueid
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
@@ -927,7 +929,7 @@ update_issue3() {
 }
 
 generate_issue_template() {
-	local tmpfile=$TMPDIR/new/$RM_DRAFT_FILENAME
+	local tmpfile=$TMPDIR/$RM_DRAFT_FILENAME
 	mkdir -p $(dirname $tmpfile)
 
 	if [ "$TEMPLATE" ] ; then
@@ -969,8 +971,8 @@ generate_issue_template() {
 create_issue2() {
 	local tmpfile="$1"
 
-	create_ticket $tmpfile "" $TMPDIR/new/create.json > $TMPDIR/new/create.result.json
-	local newissueid=$(jq -r ".issue.id" $TMPDIR/new/create.result.json)
+	create_ticket $tmpfile "" $TMPDIR/create.json > $TMPDIR/create.result.json
+	local newissueid=$(jq -r ".issue.id" $TMPDIR/create.result.json)
 	[ "$newissueid" == null ] && echo "failed to get new ticket ID" && return 1
 
 	# issueid is defined in caller update_issue()
@@ -981,9 +983,8 @@ create_issue2() {
 }
 
 update_new_issue() {
-	local draft=$TMPDIR/new/$RM_DRAFT_FILENAME
+	local draft=$TMPDIR/$RM_DRAFT_FILENAME
 
-	echo -n "$(date --iso-8601=seconds) " >> $TMPDIR/new/.clock.log
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
 		pushd $(dirname $draft)
@@ -994,6 +995,7 @@ update_new_issue() {
 		echo "You really upload this change? (y: yes, n: no, e: edit again)"
 		read input
 		if [ "$input" == y ] || [ "$input" == Y ] ; then
+			echo create_issue2 $draft
 			create_issue2 $draft
 			break
 		elif [ "$input" == n ] || [ "$input" == N ] ; then
@@ -1004,18 +1006,14 @@ update_new_issue() {
 		fi
 	done
 	trap 2
-	echo "$(date --iso-8601=seconds)" >> $TMPDIR/new/.clock.log
 
 	if [ "$issueid" ] ; then
 		echo "new ticket: $issueid"
-		mkdir -p $TMPD/$issueid
-		cp $TMPDIR/new/.clock.log $TMPD/$issueid/
-		__create_time_entry $issueid
-		( update_local_cache_task $issueid ) &
-	elif [ "$NEWLOCALTID" ] ; then
-		echo "new ticket: $NEWLOCALTID"
-		mkdir -p $TMPD/$NEWLOCALTID/
-		rsync -a $TMPDIR/new/ $TMPD/$NEWLOCALTID/
+		__close_clock $issueid
+		update_local_cache_task $issueid
+		# mkdir -p $TMPD/$issueid
+		# cp $TMPDIR/new/.clock.log $TMPD/$issueid/
+		# __create_time_entry $issueid
 	fi
 }
 
