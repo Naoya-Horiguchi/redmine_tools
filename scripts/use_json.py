@@ -198,9 +198,9 @@ def show_ticket(tid, showPj):
     if str(tid) in relations.keys():
         rel = relations[str(tid)]
     if showPj:
-        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], pjs[tid], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
+        print("%s\tPJ%d\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid][2:-4], pjs[tid], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
     else:
-        print("%s\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
+        print("%s\t<%s|%s|%s|%s>\t%d%s\t%s" % (updateds[tid][2:-4], trackers[tid], status[tid], ratios[tid], priority_color(prios[tid]), tid, rel, subjects[tid]))
 
 if not grouping:
     sorted_tids = sorted(globalIds, key=take_updated_on)
