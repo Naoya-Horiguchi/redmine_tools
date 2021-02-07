@@ -77,11 +77,6 @@ if ! check_ticket_id_format $ISSUEID ; then
 	exit 1
 fi
 
-if [[ "$ISSUEID" =~ ^L ]] ; then
-	cat $TMPD/$ISSUEID/draft.md
-	exit
-fi
-
 update_local_cache_task $ISSUEID || exit 1
 ! check_issue_exist $ISSUEID && echo "issue $ISSUEID not found" && exit 1
 
