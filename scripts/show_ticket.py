@@ -30,6 +30,36 @@ text = data.decode('utf-8')
 encoding = response.info().get_content_charset('utf-8')
 text = json.loads(data.decode(encoding))
 
+tracker_id_to_name = {}
+with open(os.environ.get('RM_CONFIG')+ '/trackers.json') as json_file:
+    data = json.load(json_file)
+    for d in data['trackers']:
+        tracker_id_to_name[d['id']] = d['name']
+
+status_id_to_name = {}
+with open(os.environ.get('RM_CONFIG')+ '/issue_statuses.json') as json_file:
+    data = json.load(json_file)
+    for d in data['issue_statuses']:
+        status_id_to_name[d['id']] = d['name']
+
+project_id_to_name = {}
+with open(os.environ.get('RM_CONFIG')+ '/projects.json') as json_file:
+    data = json.load(json_file)
+    for d in data['projects']:
+        project_id_to_name[d['id']] = d['name']
+
+priority_id_to_name = {}
+with open(os.environ.get('RM_CONFIG')+ '/priorities.json') as json_file:
+    data = json.load(json_file)
+    for d in data['issue_priorities']:
+        priority_id_to_name[d['id']] = d['name']
+
+user_id_to_name = {}
+with open(os.environ.get('RM_CONFIG')+ '/users.json') as json_file:
+    data = json.load(json_file)
+    for d in data['users']:
+        user_id_to_name[d['id']] = d['login']
+
 issue = text['issue']
 
 print("#+Issue: %s" % issue['id'])
@@ -67,6 +97,39 @@ def print_six(row, format):
 if showJournals != True:
     exit(0)
 
+def print_attr(name, old, new):
+    if name == 'tracker_id':
+        name = 'Tracker'
+        if int(old) in tracker_id_to_name:
+            old = tracker_id_to_name[int(old)]
+        if int(new) in tracker_id_to_name:
+            new = tracker_id_to_name[int(new)]
+    if name == 'status_id':
+        name = 'Status'
+        if int(old) in status_id_to_name:
+            old = status_id_to_name[int(old)]
+        if int(new) in status_id_to_name:
+            new = status_id_to_name[int(new)]
+    if name == 'project_id':
+        name = 'Project'
+        if int(old) in project_id_to_name:
+            old = project_id_to_name[int(old)]
+        if int(new) in project_id_to_name:
+            new = project_id_to_name[int(new)]
+    if name == 'priority_id':
+        name = 'Priority'
+        if int(old) in priority_id_to_name:
+            old = priority_id_to_name[int(old)]
+        if int(new) in priority_id_to_name:
+            new = priority_id_to_name[int(new)]
+    if name == 'assigned_to_id':
+        name = 'Assigned'
+        if old != None:
+            old = user_id_to_name[int(old)]
+        if new != None:
+            new = user_id_to_name[int(new)]
+    print('    %s: %s -> %s' % (name, old, new))
+
 import difflib
 for journal in reversed(issue['journals']):
     print(bg(fg("Journal ID: %s" % journal['id'], 11), 102))
@@ -85,7 +148,7 @@ for journal in reversed(issue['journals']):
     if attrs or journal['notes']:
         print("")
         for attr in attrs:
-            print('    %s: %s -> %s' % (attr['name'], attr['old_value'], attr['new_value']))
+            print_attr(attr['name'], attr['old_value'], attr['new_value'])
         if journal['notes']:
             print("")
             print(re.sub('^', ' '*4, journal['notes'], flags=re.MULTILINE))
