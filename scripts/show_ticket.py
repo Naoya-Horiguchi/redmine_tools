@@ -131,8 +131,12 @@ def print_attr(name, old, new):
     print('    %s: %s -> %s' % (name, old, new))
 
 import difflib
+
+i = len(issue['journals'])
 for journal in reversed(issue['journals']):
     print(bg(fg("Journal ID: %s" % journal['id'], 11), 102))
+    print(bg(fg("Note: %d" % i, 0), 230))
+    i -= 1
     print(fg("Author: %s" % journal['user']['name'], 150))
     print(fg("Date: %s" % journal['created_on'], 213))
     attrs = []
