@@ -105,7 +105,7 @@ statusspec_to_statusid() {
 	else
 		# TODO: if found multiple record? -> first match
 		# TODO: escape input? what if pjspec contains ','?
-		jq -r ".issue_statuses[] | select(.name|test(\"$spec\";\"i\")) | .id" $RM_CONFIG/issue_statuses.json
+		jq -r ".issue_statuses[] | select(.name|test(\"^$spec\";\"i\")) | .id" $RM_CONFIG/issue_statuses.json
 	fi
 }
 

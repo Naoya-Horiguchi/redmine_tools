@@ -9,7 +9,7 @@ json_add_text() {
 	local text="$3"
 
 	cp $file $TMPDIR/tmp.json
-	jq --arg text "$text" $position='$text' $TMPDIR/tmp.json > $file
+	jq -r --arg text "$text" $position='$text' $TMPDIR/tmp.json > $file
 }
 
 json_add_int() {
@@ -18,7 +18,7 @@ json_add_int() {
 	local int="$3"
 
 	cp $file $TMPDIR/tmp.json
-	jq $position=$int $TMPDIR/tmp.json > $file
+	jq -r $position=$int $TMPDIR/tmp.json > $file
 }
 
 __update_ticket() {
