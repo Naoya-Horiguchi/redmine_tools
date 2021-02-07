@@ -252,15 +252,13 @@ __curl_limit() {
 	local pages=$[($limit - 1) / $step + 1]
 	[ ! "$totalcount" ] && return 1
 
-	local tmpd=$(mktemp -d)
 	local files=
 	for i in $(seq 0 $[pages-1]) ; do
-		curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}&offset=$[i*step]&limit=$[limit-i*step]" > $tmpd/page.$i.json || exit 1
-		files="$files $tmpd/page.$i.json"
+		curl ${INSECURE:+-k} -s "${requestbase}${data:+&$data}&offset=$[i*step]&limit=$[limit-i*step]" > $TMPDIR/page.$i.json || exit 1
+		files="$files $TMPDIR/page.$i.json"
 	done
 
 	jq 'reduce inputs as $i (.; .'$key' += $i.'$key')' $files > $out
-	# rm -rf $tmpd
 }
 
 __curl() {
@@ -820,15 +818,16 @@ edit_issue3() {
 		elif [ "$input" == n ] || [ "$input" == N ] ; then
 			return 1 # abort
 		elif [ "$input" == s ] || [ "$input" == S ] ; then
-			cp $draft $TMPD/$issueid/saved_draft
-			local currentclock="$(grep -i ^#\+timeentry: $TMPD/$issueid/saved_draft | sed 's|^#+timeentry: *||i')"
-			local openclock="$(tail -n1 $TMPD/$issueid/.clock.log | cut -f1 -d' ')"
-			openclock=$(date -d $openclock +%s 2> /dev/null)
-			local closeclock=$(date +%s 2> /dev/null)
-			local clock=$[(closeclock-openclock)/60]
-			sed -i "s/^#+timeentry:.*/#+TimeEntry: $[${currentclock%%+}+${clock}]+/i" $TMPD/$issueid/saved_draft
-			cp ${draft}.before_edit $TMPD/$issueid/saved_draft.before_edit
-			cp $TMPDIR/tmp.before_edit $TMPD/$issueid/saved_before_edit
+			mkdir -p $RM_CONFIG/saved_draft
+			cp $draft $RM_CONFIG/saved_draft/$issueid.md
+			local currentclock="$(grep -i ^#\+timeentry: $draft | sed 's|^#+timeentry: *||i')"
+			local tin=$(date -d $TIMESTAMP +%s 2> /dev/null)
+			local tout=$(date +%s 2> /dev/null)
+			local clock=$[$tout - $tin]
+
+			sed -i "s/^#+timeentry:.*/#+TimeEntry: $[${currentclock%%+}+${clock}]+/i" $RM_CONFIG/saved_draft/$issueid.md
+			cp $TMPDIR/tmp.before_edit $RM_CONFIG/saved_draft/$issueid.md.before_edit
+			cp ${draft}.before_edit $RM_CONFIG/saved_draft/$issueid.md.before_edit_with_note
 			return 2 # abort
 		else
 			true # edit again
@@ -866,10 +865,10 @@ update_issue3() {
 		__check_opened $issueid || return 1
 	fi
 
-	if [ -s "$TMPD/$issueid/saved_before_edit" ] ; then
-		mv "$TMPD/$issueid/saved_before_edit" "$TMPDIR/tmp.before_edit"
-		mv $TMPD/$issueid/saved_draft $draft
-		mv $TMPD/$issueid/saved_draft.before_edit ${draft}.before_edit
+	if [ -s "$RM_CONFIG/saved_draft/$issueid.md" ] ; then
+		mv $RM_CONFIG/saved_draft/$issueid.md $draft
+		mv $RM_CONFIG/saved_draft/$issueid.md.before_edit $TMPDIR/tmp.before_edit
+		mv $RM_CONFIG/saved_draft/$issueid.md.before_edit_with_note $draft.before_edit
 	else
 		__curl "/issues.json" $TMPDIR/tmp.before_edit "&issue_id=$issueid&include=relations&status_id=*"
 		convert_to_draft_from_json $issueid $TMPDIR/tmp.before_edit $draft
