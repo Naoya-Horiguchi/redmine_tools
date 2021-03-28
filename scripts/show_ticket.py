@@ -15,6 +15,10 @@ showJournals = False
 if os.environ.get('SHOW_JOURNALS') and re.match(r'true', os.environ.get('SHOW_JOURNALS'), re.IGNORECASE):
     showJournals = True
 
+showUsername = False
+if os.environ.get('RM_USERLIST') and re.match(r'true', os.environ.get('RM_USERLIST'), re.IGNORECASE):
+    showUsername = True
+
 scontext = ssl.SSLContext(ssl.PROTOCOL_TLS)
 url = "%s/issues.json?key=%s&issue_id=605&include=relations&status_id=*" % (os.environ.get('RM_BASEURL'), os.environ.get('RM_KEY'))
 url = "%s/issues/%s.json?key=%s&include=journals" % (os.environ.get('RM_BASEURL'), sys.argv[1], os.environ.get('RM_KEY'))
@@ -55,10 +59,11 @@ with open(os.environ.get('RM_CONFIG')+ '/priorities.json') as json_file:
         priority_id_to_name[d['id']] = d['name']
 
 user_id_to_name = {}
-with open(os.environ.get('RM_CONFIG')+ '/users.json') as json_file:
-    data = json.load(json_file)
-    for d in data['users']:
-        user_id_to_name[d['id']] = d['login']
+if showUsername == True:
+    with open(os.environ.get('RM_CONFIG')+ '/users.json') as json_file:
+        data = json.load(json_file)
+        for d in data['users']:
+            user_id_to_name[d['id']] = d['login']
 
 issue = text['issue']
 
@@ -122,7 +127,7 @@ def print_attr(name, old, new):
             old = priority_id_to_name[int(old)]
         if int(new) in priority_id_to_name:
             new = priority_id_to_name[int(new)]
-    if name == 'assigned_to_id':
+    if showUsername == True and name == 'assigned_to_id':
         name = 'Assigned'
         if old != None:
             old = user_id_to_name[int(old)]
