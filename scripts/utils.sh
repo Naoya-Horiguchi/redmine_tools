@@ -175,7 +175,17 @@ __update_ticket() {
 	fi
 	if [ "$due_date" ] ; then
 		if [ "$due_date" == "null" ] || [ "$due_date" == "None" ] ; then
-			json_add_text $outjson .issue.due_date "" || return 1
+			if status_closed "$status" ; then
+				local closed_date="$(jq -r ".issues[] | select(.id == $issue) | .closed_on" $RM_CONFIG/issues.json)"
+				if [ "$closed_date" == "null" ] ; then
+					local date_text="$(date -d "today" +%Y-%m-%d)"
+				else
+					local date_text="$(date -d $closed_date +%Y-%m-%d)"
+				fi
+				json_add_text $outjson .issue.due_date "$date_text" || return 1
+			else
+				json_add_text $outjson .issue.due_date "" || return 1
+			fi
 		elif echo "$due_date" | grep -q "^-\?[0-9]\+$" ; then # relative date
 			local date_text="$(date -d "today $due_date days" +%Y-%m-%d)"
 			json_add_text $outjson .issue.due_date "$date_text" || return 1
