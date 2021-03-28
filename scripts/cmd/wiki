@@ -51,7 +51,8 @@ done
 PROJECT="$1"
 shift 1
 [ ! "$WIKIPAGE" ] && WIKIPAGE=Wiki # default wiki page
-WIKIPAGE="$(python -c "import urllib;print urllib.quote(raw_input())" <<< "$@")"
+# WIKIPAGE="$(python -c "import urllib;print urllib.quote(raw_input())" <<< "$@")"
+WIKIPAGE="$(python -c "import urllib.parse; print(urllib.parse.quote(input()))" <<< "$@")"
 
 pjid_to_pjidentifier() {
 	jq -r ".projects[] | select(.id == $1) | .identifier" $RM_CONFIG/projects.json
