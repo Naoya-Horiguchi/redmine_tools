@@ -23,7 +23,7 @@ json_add_int() {
 
 __update_ticket() {
 	local file="$1"
-	local issueid="$2"  # could be empty
+	local issueid="$2"  # could be empty when creating ticket
 	local outjson="$3"
 
 	[ ! "$outjson" ] && outjson=$TMPD/$issue/upload.json
@@ -164,7 +164,13 @@ __update_ticket() {
 
 	if [ "$start_date" ] ; then
 		if [ "$start_date" == "null" ] || [ "$start_date" == "None" ] ; then
-			json_add_text $outjson .issue.start_date "" || return 1
+			# 新規作成チケットが New 以外だった場合、自動で start date を当日にする。
+			if [ ! "$issueid" ] && [ "$RM_RULE_OPEN_AUTO_START_DATE" ] && [ "$status" != "$RM_RULE_OPEN_AUTO_START_DATE" ] ; then
+				local date_text="$(date -d "today" +%Y-%m-%d)"
+				json_add_text $outjson .issue.start_date "$date_text" || return 1
+			else
+				json_add_text $outjson .issue.start_date "" || return 1
+			fi
 		elif echo "$start_date" | grep -q "^-\?[0-9]\+$" ; then # relative date
 			local date_text="$(date -d "today $start_date days" +%Y-%m-%d)"
 			json_add_text $outjson .issue.start_date "$date_text" || return 1
