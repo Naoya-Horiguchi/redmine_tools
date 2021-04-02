@@ -968,19 +968,19 @@ generate_issue_template() {
 
 	# echo "#+Issue: $(jq -r .id $tmpjson)" >> $tmpfile
 	echo -n "" > $tmpfile
-	echo "#+Project: " >> $tmpfile
-	echo "#+Subject: subject" >> $tmpfile
+	echo "#+Project: $PROJECT" >> $tmpfile
+	echo "#+Subject: $SUBJECT" >> $tmpfile
 	# TODO: tracker/status/priority は設定に応じたデフォルト値を与えるべき -> サーバの設定を利用すべき
-	echo "#+Tracker: $RM_DEFAULT_TRACKER" >> $tmpfile
+	echo "#+Tracker: $TRACKER" >> $tmpfile
 	# echo "#+Category: null" >> $tmpfile
-	echo "#+Status: $(get_trackers_default_status $RM_DEFAULT_TRACKER)" >> $tmpfile
+	echo "#+Status: $(get_trackers_default_status $TRACKER)" >> $tmpfile
 	echo "#+Priority: Normal" >> $tmpfile
-	echo "#+ParentIssue: null" >> $tmpfile
+	echo "#+ParentIssue: $PARENT" >> $tmpfile
 	if [ "$RM_USERLIST" ] ; then
 		echo "#+Assigned: null" >> $tmpfile
 	fi
 	echo "#+DoneRatio: 0" >> $tmpfile
-	echo "#+Estimate: 1" >> $tmpfile
+	echo "#+Estimate: $ESTIMATE" >> $tmpfile
 	echo "#+StartDate: null" >> $tmpfile
 	echo "#+DueDate: null" >> $tmpfile
 	echo "#+TimeEntry: 0" >> $tmpfile
@@ -1012,7 +1012,9 @@ update_new_issue() {
 	trap "__close_clock $issueid ; exit 0" 2
 	while true ; do
 		pushd $(dirname $draft)
-		$EDITOR $draft
+		if [ ! "$NOEDITOR" ] ; then
+			$EDITOR $draft
+		fi
 		popd
 		[ "$NEWLOCALTID" ] && break # new local ticket
 		echo

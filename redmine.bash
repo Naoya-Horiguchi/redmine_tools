@@ -20,5 +20,13 @@ redmine() {
 		printf $'\033k'RM_$tag$'\033'\\
 	fi
 
-	bash $thisdir/scripts/main.sh $@
+	local args=
+	for a in "$@" ; do
+		if [[ "$a" =~ ' ' ]] ; then
+			args="$args \"$a\""
+		else
+			args="$args $a"
+		fi
+	done
+	eval bash $thisdir/scripts/main.sh $args
 }

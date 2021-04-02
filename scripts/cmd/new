@@ -6,9 +6,15 @@
 # Description
 #
 # Options
-#   -t|--template <file>     create new ticket from given template file
-#   -t|--template <ticketID> create new ticket with template from given ticket ID
-#   -l                       create local ticket
+#
+#   -p|--project <project>   specify project
+#   -P|--parent <project>    specify parent ticket ID
+#   -t|--tracker <tracker>   specify tracker
+#   -s|--subject <tracker>   specify subject
+#   -e|--estimate <hours>    specify estimated hours
+#
+#   -T|--template <file>     create new ticket from given template file
+#   -T|--template <ticketID> create new ticket with template from given ticket ID
 #   -h                       show this message
 #
 
@@ -17,10 +23,39 @@ show_help() {
 }
 
 TEMPLATE=
+TRACKER=$RM_DEFAULT_TRACKER
+PARENT=null
+ESTIMATE=1
+NOEDITOR=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
-		-t|--template)
+		-p|--project)
+			PROJECT=$2
+			NOEDITOR=true
+			shift 2
+			;;
+		-P|--parent)
+			PARENT=$2
+			NOEDITOR=true
+			shift 2
+			;;
+		-t|--tracker)
+			TRACKER=$2
+			NOEDITOR=true
+			shift 2
+			;;
+		-s|--subject)
+			SUBJECT="$2"
+			NOEDITOR=true
+			shift 2
+			;;
+		-e|--estimate)
+			ESTIMATE=$2
+			NOEDITOR=true
+			shift 2
+			;;
+		-T|--template)
 			TEMPLATE=$2
 			shift 2
 			if [ ! -s "$TEMPLATE" ] ; then
@@ -41,10 +76,6 @@ while [[ $# -gt 0 ]] ; do
 			;;
 	esac
 done
-
-if [ "$LOCALTICKET" ] ; then
-	NEWLOCALTID="$(generate_local_ticket_id)"
-fi
 
 generate_issue_template || exit 1
 update_new_issue
