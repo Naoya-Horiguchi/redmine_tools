@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# Usage
+#   redmine server [options]
+#   redmine server <server_name> [options]
+#
+# Description
+#
+# Options
+#
+#   -h                       show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+if [ ! -d "$HOME/.redmine" ] ; then
+	echo "no redmine config directory ($HOME/.redmine) abort" >&2
+elif [ "$#" -eq 0 ] ; then
+	echo "List of registered servers:"
+	for sv in $(ls -1 "$HOME/.redmine" | grep -v tmp) ; do
+		if [ "$sv" == "$RM_SETTING_NAME" ] ; then
+			echo "  $sv *"
+		else
+			echo "  $sv"
+		fi
+	done
+else
+	server_name=$1
+	if [ ! -s "$HOME/.redmine/$server_name" ] ; then
+		echo "server $server_name not found." >&2
+	fi
+
+	. "$HOME/.redmine/$server_name"
+	echo "switched server to $server_name"
+fi

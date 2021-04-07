@@ -20,6 +20,11 @@ redmine() {
 		printf $'\033k'RM_$tag$'\033'\\
 	fi
 
+	if [ "$1" == "server" ] ; then
+		. $thisdir/scripts/main.sh
+		return 0
+	fi
+
 	local args=
 	for a in "$@" ; do
 		if [[ "$a" =~ ' ' ]] ; then

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Usage
+#   redmine status [options]
+#
+# Description
+#
+# Options
+#
+#   -h                       show this message
+#
+
+show_help() {
+	sed -n 2,$[$BASH_LINENO-4]p $BASH_SOURCE | grep "^#" | sed 's/^#/ /'
+}
+
+while [[ $# -gt 0 ]] ; do
+	key="$1"
+	case $key in
+		-h)
+			show_help
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+setting_name=$(basename $RM_CONFIG)
+echo "setting name: $setting_name"
+echo "base URL: $RM_BASEURL"
+echo "cache directory: $RM_CONFIG"
+echo
+echo "saved drafts:"
+if [ -d $RM_CONFIG/saved_draft ] ; then
+	for draft in $(find $RM_CONFIG/saved_draft -type f | grep -e "[0-9].md$" -e "[0-9].rst$") ; do
+		base=$(basename $draft)
+		subj=$(grep ^#+Subject: $draft | sed 's/#+Subject: //')
+		echo "  ${base%.*}    $subj"
+	done
+fi
+echo
