@@ -84,7 +84,7 @@ get_json_string() {
 	local issueid="$1"
 	local issuetoid="$2"
 	local reltype="$3"
-	echo "{\"relation\": {\"issue_to_id\": $issuetoid, \"relation_type\": \"$reltype\"}}"
+	echo "{\"relation\": {\"issue_to_id\": \"$issuetoid\", \"relation_type\": \"$reltype\"}}"
 }
 
 # input: draft file

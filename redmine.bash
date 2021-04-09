@@ -20,7 +20,9 @@ redmine() {
 		printf $'\033k'RM_$tag$'\033'\\
 	fi
 
-	if [ "$1" == "server" ] ; then
+	# server subcommand could update environment variable, so
+	# need to execute in this shell (not in the subshell).
+	if [ "$1" == "server" ] || [ "$1" == "relation" ] ; then
 		. $thisdir/scripts/main.sh
 		return 0
 	fi

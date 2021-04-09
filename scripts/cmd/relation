@@ -5,9 +5,17 @@
 #   redmine relation [option] -d <id|idspec> [...]
 #
 # Description
-#   ...
+#   relations are notated by <idspec> like follows:
 #
-#   idspec is ...
+#     (issue1)->(issue2)   issue1 precedes issue2
+#     (issue1)<-(issue2)   issue1 follows issue2
+#     (issue1)-o(issue2)   issue1 blocks issue2
+#     (issue1)o-(issue2)   issue1 blocked issue2
+#     (issue1)-c(issue2)   issue1 copied_to issue2
+#     (issue1)c-(issue2)   issue1 copied_from issue2
+#     (issue1)-(issue2)    issue1 relates issue2
+#     (issue1)=>(issue2)   issue1 duplicates issue2
+#     (issue1)<=(issue2)   issue1 duplicated issue2
 #
 # Options
 #   -d            delete relation
