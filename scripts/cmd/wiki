@@ -1,14 +1,17 @@
 #!/bin/bash
 #
 # Usage
-#   redmine wiki [options] pjspec [wikiname]
+#   redmine wiki -l
+#   redmine wiki [-u file] [wikipageid]
 #
 # Description
+#   Edit and update a given wiki page with your favorite editor.
+#   Wiki page IDs are available by "show list" option (-l),
+#   that are represented by "<project ID>-<index>"
 #
 # Options
 #   -l            list wiki pages under the project
 #   -u file       upload file
-#   -d            debug
 #   -h            show this message
 #
 
@@ -18,7 +21,6 @@ show_help() {
 
 LIST=
 UPLOADFILE=
-DEBUG=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
@@ -30,10 +32,6 @@ while [[ $# -gt 0 ]] ; do
 			UPLOADFILE="$2"
 			shift 2
 			;;
-		-d)
-			DEBUG=true
-			shift 1
-			;;
 		-h)
 			show_help
 			exit 0
@@ -44,15 +42,6 @@ while [[ $# -gt 0 ]] ; do
 			;;
 	esac
 done
-
-[ -t 1 ] && . $THISDIR/color.sh
-[ "$#" -eq 0 ] && echo "no argument given" && show_help && exit 0
-
-PROJECT="$1"
-shift 1
-[ ! "$WIKIPAGE" ] && WIKIPAGE=Wiki # default wiki page
-# WIKIPAGE="$(python -c "import urllib;print urllib.quote(raw_input())" <<< "$@")"
-WIKIPAGE="$(python -c "import urllib.parse; print(urllib.parse.quote(input()))" <<< "$@")"
 
 pjid_to_pjidentifier() {
 	jq -r ".projects[] | select(.id == $1) | .identifier" $RM_CONFIG/projects.json
@@ -106,58 +95,21 @@ update_wiki_page() {
 	done
 }
 
-if [ "$DEBUG" ] ; then
-	for pjspec in $PROJECT ; do
-		for pjid in $(pjspec_to_pjid $pjspec) ; do
-			pjidstr=$(pjid_to_pjidentifier $pjid)
-			# update_wiki_page $pjidstr $WIKIPAGE
-			curl -sk $RM_BASEURL/projects/${pjidstr}/wiki/${WIKIPAGE}.json?key=${RM_KEY} | jq -r .
-			break # use only first one
-		done
-		break # use only first one
-	done
-	exit 0
-fi
-
-for pjspec in $PROJECT ; do
-	for pjid in $(pjspec_to_pjid $pjspec) ; do
-		pjidstr=$(pjid_to_pjidentifier $pjid)
-		curl -sk $RM_BASEURL/projects/$pjidstr/wiki/index.json?key=${RM_KEY} > $TMPDIR/wikilist
-		# update_wiki_page $pjidstr $WIKIPAGE
-		break # use only first one
-	done
-	break # use only first one
+for pjid in $(jq -r ".projects[] | .id" $RM_CONFIG/projects.json) ; do
+	curl -sk $RM_BASEURL/projects/$pjid/wiki/index.json?key=${RM_KEY} | jq -r '.wiki_pages | to_entries | map([.key, .value.title])[] | @tsv' | sed "s/^/$pjid-/" >> $TMPDIR/wikilist.tsv
 done
 
 if [ "$LIST" ] ; then
-	echo -e "UpdatedOn\tWikiPage" > $TMPDIR/wikilist.tsv
-	jq -r '.wiki_pages[] | [.updated_on, .title] | @tsv' $TMPDIR/wikilist >> $TMPDIR/wikilist.tsv
-	# tin=$(date -d 2020-01-17T00:13:39Z +%y%m%d_%H%M 2> /dev/null)
-	expand -t 25 $TMPDIR/wikilist.tsv
-
-	exit 0
+	cat $TMPDIR/wikilist.tsv
+elif [ "$1" ] ; then
+	WIKIPAGEID=$1
+	WIKIPAGENAME="$(grep -P "${WIKIPAGEID}\t" $TMPDIR/wikilist.tsv | cut -f2)"
+	if [ "$WIKIPAGENAME" ] ; then
+		update_wiki_page "$(echo $WIKIPAGEID | cut -f1 -d'-')" "$WIKIPAGENAME"
+	else
+		echo "Failed to get wikiname for ID $WIKIPAGEID" >&2
+		exit 1
+	fi
+else
+	show_help
 fi
-
-if [ "$UPLOADFILE" ] ; then
-	curl ${INSECURE:+-k} -s -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/projects/25/files.json?filename=$UPLOADFILE || return 1
-	echo ""
-	exit 0
-fi
-
-# canonicalize wikipage name
-out="$out $(jq -r ".wiki_pages[] | select(.title|test(\"^${WIKIPAGE}$\";\"i\")) | .title" $TMPDIR/wikilist)"
-# 完全一致するプロジェクトが存在しないときは部分一致でマッチする。複数ヒットすることがある。
-if [ "$out" == " " ] ; then
-	out="$out $(jq -r ".wiki_pages[] | select(.title|test(\"${WIKIPAGE}\";\"i\")) | .title" $TMPDIR/wikilist)"
-fi
-WIKIPAGE=$out
-
-# TODO: need only exact matching flag
-for pjspec in $PROJECT ; do
-	for pjid in $(pjspec_to_pjid $pjspec) ; do
-		pjidstr=$(pjid_to_pjidentifier $pjid)
-		update_wiki_page $pjidstr $WIKIPAGE
-		break # use only first one
-	done
-	break # use only first one
-done
