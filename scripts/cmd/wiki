@@ -2,7 +2,8 @@
 #
 # Usage
 #   redmine wiki -l
-#   redmine wiki [-u file] [wikipageid]
+#   redmine wiki -s <wikipageid>
+#   redmine wiki [-u file] <wikipageid>
 #
 # Description
 #   Edit and update a given wiki page with your favorite editor.
@@ -11,6 +12,7 @@
 #
 # Options
 #   -l            list wiki pages under the project
+#   -s            show wiki page with change history
 #   -u file       upload file
 #   -h            show this message
 #
@@ -20,12 +22,17 @@ show_help() {
 }
 
 LIST=
+SHOW=
 UPLOADFILE=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
 	case $key in
 		-l)
 			LIST=true
+			shift 1
+			;;
+		-s)
+			SHOW=true
 			shift 1
 			;;
 		-u)
@@ -101,15 +108,29 @@ done
 
 if [ "$LIST" ] ; then
 	cat $TMPDIR/wikilist.tsv
-elif [ "$1" ] ; then
-	WIKIPAGEID=$1
-	WIKIPAGENAME="$(grep -P "${WIKIPAGEID}\t" $TMPDIR/wikilist.tsv | cut -f2)"
-	if [ "$WIKIPAGENAME" ] ; then
-		update_wiki_page "$(echo $WIKIPAGEID | cut -f1 -d'-')" "$WIKIPAGENAME"
-	else
-		echo "Failed to get wikiname for ID $WIKIPAGEID" >&2
-		exit 1
-	fi
 else
-	show_help
+	if [ "$1" ] ; then
+		WIKIPAGEID=$1
+		WIKIPAGENAME="$(grep -P "${WIKIPAGEID}\t" $TMPDIR/wikilist.tsv | cut -f2)"
+		pjid="$(echo $WIKIPAGEID | cut -f1 -d'-')"
+		if [ "$WIKIPAGENAME" ] ; then
+			if [ "$SHOW" ] ; then
+				curl -sk $RM_BASEURL/projects/${pjid}/wiki/${WIKIPAGENAME}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
+				versions="$(jq -r .wiki_page.version $TMPDIR/wiki.json)"
+				update="$(jq -r .wiki_page.updated_on $TMPDIR/wiki.json)"
+				text="$(jq -r .wiki_page.text $TMPDIR/wiki.json)"
+				echo "#+Version: $versions"
+				echo "#+Updated: $update"
+				echo
+				jq -r .wiki_page.text $TMPDIR/wiki.json
+			else
+				update_wiki_page "$pjid" "$WIKIPAGENAME"
+			fi
+		else
+			echo "Failed to get wikiname for ID $WIKIPAGEID" >&2
+			exit 1
+		fi
+	else
+		show_help
+	fi
 fi
