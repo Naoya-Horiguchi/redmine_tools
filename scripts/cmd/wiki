@@ -3,6 +3,7 @@
 # Usage
 #   redmine wiki -l
 #   redmine wiki -s <wikipageid>
+#   redmine wiki -n <project ID> "<WikiPageIDString>"
 #   redmine wiki [-u file] <wikipageid>
 #
 # Description
@@ -13,6 +14,7 @@
 # Options
 #   -l            list wiki pages under the project
 #   -s            show wiki page with change history
+#   -n            create new wiki page under given project
 #   -u file       upload file
 #   -h            show this message
 #
@@ -23,6 +25,7 @@ show_help() {
 
 LIST=
 SHOW=
+NEWWIKIPJ=
 UPLOADFILE=
 while [[ $# -gt 0 ]] ; do
 	key="$1"
@@ -34,6 +37,11 @@ while [[ $# -gt 0 ]] ; do
 		-s)
 			SHOW=true
 			shift 1
+			;;
+		-n)
+			NEWWIKIPJ="$2"
+			shift 2
+			WIKIPAGENAME="$@"
 			;;
 		-u)
 			UPLOADFILE="$2"
@@ -63,6 +71,20 @@ update_wiki_page() {
 		extension=.md
 	fi
 
+	# create new wiki page
+	if [ "$NEWWIKIPJ" ] ; then
+		touch $TMPDIR/wiki.text
+		touch $TMPDIR/wiki.text.updated${extension}
+		touch $TMPDIR/wiki.updated_on
+
+		$EDITOR $TMPDIR/wiki.text.updated${extension}
+		local uploadjson=$TMPDIR/wiki.upload.json
+		echo "{\"wiki_page\": {}}" > $uploadjson
+		json_add_text $uploadjson .wiki_page.text "$(cat $TMPDIR/wiki.text.updated${extension})" || return 1
+		curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X PUT --data-binary "@${uploadjson}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage// /_}.json || return 1
+		return
+	fi
+
 	curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
 	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text
 	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text.updated${extension}
@@ -72,7 +94,6 @@ update_wiki_page() {
 		diff -u $TMPDIR/wiki.text $TMPDIR/wiki.text.updated${extension} > $TMPDIR/wiki.text.diff
 		if [ -s "$TMPDIR/wiki.text.diff" ] ; then
 			cat "$TMPDIR/wiki.text.diff"
-			# ask
 			echo
 			echo "You really upload this change? (y: yes, n: no, e: edit again)"
 			read input
@@ -108,6 +129,9 @@ done
 
 if [ "$LIST" ] ; then
 	cat $TMPDIR/wikilist.tsv
+elif [ "$NEWWIKIPJ" ] ; then
+	pjid="$(pjspec_to_pjid $NEWWIKIPJ)"
+	update_wiki_page "$pjid" "$WIKIPAGENAME"
 else
 	if [ "$1" ] ; then
 		WIKIPAGEID=$1
