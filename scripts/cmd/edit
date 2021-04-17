@@ -116,7 +116,7 @@ if [ "$DRAFT" ] ; then
 		exit 1
 	fi
 
-	ISSUEID="$(grep -i ^#\+issue: $DRAFT | sed 's|^#+issue: *||i')"
+	ISSUEID="$(grep -i "^#+issue:" $DRAFT | sed 's|^#+issue: *||i')"
 
 	if [ ! "$ISSUEID" ] ; then
 		echo "No issue ID in a given file" >&2
