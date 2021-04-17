@@ -392,6 +392,7 @@ __open_clock() {
 
 __create_time_entry() {
 	local issueid="$1"
+	local ret=1
 
 	# local record="$(tail -n1 $TMPD/$issueid/.clock.log)"
 	# local cin=$(echo $record | cut -f1 -d' ')
@@ -407,13 +408,11 @@ __create_time_entry() {
 	# time_entry explicitly given in draft file.
 	local draftClock="$(grep -i ^#\+timeentry: $TMPDIR/$RM_DRAFT_FILENAME | sed 's|^#+timeentry: *||i')"
 	if [ "$draftClock" != 0 ] ; then
+		local dclock=$[draftClock*60]
 		if [[ "$draftClock" =~ \+$ ]] ; then
-			local dclock=$[${draftClock%%+}*60 + $clock]
-			create_time_entry "$issueid" "$(calc_clock_hour $dclock)" "" "" "" > /dev/null
-		else
-			create_time_entry "$issueid" "$(calc_clock_hour $[draftClock*60])" "" "" "" > /dev/null
+			dclock=$[${draftClock%%+}*60 + $clock]
 		fi
-		return
+		clock=$dclock
 	fi
 
 	# TODO: error handling, activity?
@@ -421,15 +420,17 @@ __create_time_entry() {
 		if [ "$clock" -ge "${RM_TIME_ENTRY_MIN:=120}" ] ; then
 			if [ "$clock" -le "${RM_TIME_ENTRY_MAX:=14400}" ] ; then
 				create_time_entry "$issueid" "$(calc_clock_hour $clock)" "" "" "" > /dev/null
+				ret=0
 			fi
 		fi
 	fi
+	return $ret
 }
 
 __close_clock() {
 	local issueid=$1
 
-	__create_time_entry $issueid
+	__create_time_entry $issueid || return 0
 	sleep 0.5
 	update_local_cache_time_entries
 
