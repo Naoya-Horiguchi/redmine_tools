@@ -43,6 +43,7 @@ else
 	server_name=$1
 	if [ ! -s "$HOME/.redmine/$server_name" ] ; then
 		echo "server $server_name not found." >&2
+		return
 	fi
 
 	. "$HOME/.redmine/$server_name"
