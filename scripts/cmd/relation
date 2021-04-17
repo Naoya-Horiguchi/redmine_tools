@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]] ; do
 			;;
 		-h)
 			show_help
-			exit 0
+			return 0
 			;;
 		*)
 			# echo "invalid option $key"
@@ -53,7 +53,7 @@ done
 if [ ! "$@" ] && [ ! "$LIST" ] ; then
 	echo "no IDSPEC given."
 	show_help
-	exit 1
+	return 1
 fi
 
 update_local_cache > /dev/null 2>&1 || exit 1
