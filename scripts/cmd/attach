@@ -48,6 +48,9 @@ if [ "$LIST" ] ; then
 	# jq ".issues[] as $in | $in.instances[] as $h | $in " $RM_CONFIG/issues.json
 	# jq '.issues[] as $in | $in.attachments as $h | $in * $h' $RM_CONFIG/issues.json
 	jq -r '.issues[].attachments[] | .content_url' $RM_CONFIG/issues.json
+	if [ -s "$RM_CONFIG/wiki_attachments.json" ] ; then
+		cat $RM_CONFIG/wiki_attachments.json
+	fi
 	exit 0
 fi
 

@@ -47,6 +47,10 @@ while [[ $# -gt 0 ]] ; do
 			UPLOADFILE="$2"
 			shift 2
 			;;
+		--show-attachments)
+			cat $RM_CONFIG/wiki_attachments.json
+			exit 0
+			;;
 		-h)
 			show_help
 			exit 0
@@ -123,6 +127,13 @@ update_wiki_page() {
 	done
 }
 
+update_wiki_attachments() {
+	cp $RM_CONFIG/wiki_attachments.json $TMPDIR/wiki_attachments.json
+	# update attachment cache
+	curl -sk $RM_BASEURL/projects/${pjid}/wiki/${WIKIPAGENAME}?key=$RM_KEY | grep /attachments/download/ | grep img | cut -f2 -d\" >> $TMPDIR/wiki_attachments.json
+	sort $TMPDIR/wiki_attachments.json | uniq > $RM_CONFIG/wiki_attachments.json
+}
+
 for pjid in $(jq -r ".projects[] | .id" $RM_CONFIG/projects.json) ; do
 	curl -sk $RM_BASEURL/projects/$pjid/wiki/index.json?key=${RM_KEY} | jq -r '.wiki_pages | to_entries | map([.key, .value.title])[] | @tsv' | sed "s/^/$pjid-/" >> $TMPDIR/wikilist.tsv
 done
@@ -135,11 +146,12 @@ elif [ "$NEWWIKIPJ" ] ; then
 else
 	if [ "$1" ] ; then
 		WIKIPAGEID=$1
-		WIKIPAGENAME="$(grep -P "${WIKIPAGEID}\t" $TMPDIR/wikilist.tsv | cut -f2)"
+		WIKIPAGENAME="$(grep -P "^${WIKIPAGEID}\t" $TMPDIR/wikilist.tsv | cut -f2)"
 		pjid="$(echo $WIKIPAGEID | cut -f1 -d'-')"
 		if [ "$WIKIPAGENAME" ] ; then
 			if [ "$SHOW" ] ; then
 				curl -sk $RM_BASEURL/projects/${pjid}/wiki/${WIKIPAGENAME}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
+				update_wiki_attachments
 				versions="$(jq -r .wiki_page.version $TMPDIR/wiki.json)"
 				update="$(jq -r .wiki_page.updated_on $TMPDIR/wiki.json)"
 				text="$(jq -r .wiki_page.text $TMPDIR/wiki.json)"
