@@ -196,6 +196,14 @@ __update_ticket() {
 			local date_text="$(date -d "today $due_date days" +%Y-%m-%d)"
 			json_add_text $outjson .issue.due_date "$date_text" || return 1
 		else
+			# duedate が既に設定されているとき、チケットクローズ時に duedate を
+			# クローズ日に設定する。期日前に完了したとき、duedate が未来日になっていると
+			# 後続のタスクの予定設定に支障をきたすので。
+			if [ "$RM_RULE_SET_DUEDATE_TODAY_ON_CLOSE" ] ; then
+				if status_closed "$status" ; then
+					due_date=0
+				fi
+			fi
 			local date_text="$(date -d "$due_date" +%Y-%m-%d)"
 			json_add_text $outjson .issue.due_date "$date_text" || return 1
 		fi
