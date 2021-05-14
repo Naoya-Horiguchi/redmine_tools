@@ -63,6 +63,7 @@ TSTAMP=$(date -d $TIMESTAMP  +%y%m%d_%H%M%S)
 TMPDIR=/tmp/redmine_cli/$TSTAMP
 mkdir -p /tmp/redmine_cli/$TSTAMP
 echo "redmine $*" > $TMPDIR/cmd
+touch $TMPDIR/cmd_"$(echo $@ | sed 's/ /_/g')"
 
 REAL_SOURCE=$(readlink -f $BASH_SOURCE)
 THISDIR=$(readlink -f $(dirname $REAL_SOURCE))
