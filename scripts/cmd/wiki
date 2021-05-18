@@ -89,24 +89,31 @@ update_wiki_page() {
 		return
 	fi
 
-	curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
-	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text
-	jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text.updated${extension}
-	jq -r .wiki_page.updated_on $TMPDIR/wiki.json > $TMPDIR/wiki.updated_on
+	# edit existing wiki page
+	if [ -s "$RM_CONFIG/saved_draft/wiki_${wikipage}${extension}" ] ; then
+		mv $RM_CONFIG/saved_draft/wiki_${wikipage}${extension}.orig $TMPDIR/wiki.text
+		mv $RM_CONFIG/saved_draft/wiki_${wikipage}${extension} $TMPDIR/wiki.text.updated${extension}
+		mv $RM_CONFIG/saved_draft/wiki_${wikipage}${extension}.before_edit $TMPDIR/wiki.updated_on
+	else
+		curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
+		jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text
+		jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text.updated${extension}
+		jq -r .wiki_page.updated_on $TMPDIR/wiki.json > $TMPDIR/wiki.updated_on
+	fi
 	while true ; do
 		$EDITOR $TMPDIR/wiki.text.updated${extension}
 		diff -u $TMPDIR/wiki.text $TMPDIR/wiki.text.updated${extension} > $TMPDIR/wiki.text.diff
 		if [ -s "$TMPDIR/wiki.text.diff" ] ; then
 			cat "$TMPDIR/wiki.text.diff"
 			echo
-			echo "You really upload this change? (y: yes, n: no, e: edit again)"
+			echo "You really upload this change? (y: yes, n: no, s: save draft, e: edit again)"
 			read input
 			if [ "$input" == y ] || [ "$input" == Y ] ; then
 				curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.conflictcheck.json || exit 1
 				jq -r .wiki_page.updated_on $TMPDIR/wiki.conflictcheck.json > $TMPDIR/wiki.updated_on.conflictcheck
 				if diff -q $TMPDIR/wiki.updated_on $TMPDIR/wiki.updated_on.conflictcheck ; then
 					echo "ok, upload now"
-					
+
 					uploadjson=$TMPDIR/wiki.upload.json
 					echo "{\"wiki_page\": {}}" > $uploadjson
 					json_add_text $uploadjson .wiki_page.text "$(cat $TMPDIR/wiki.text.updated${extension})" || return 1
@@ -116,6 +123,12 @@ update_wiki_page() {
 				fi
 				break
 			elif [ "$input" == n ] || [ "$input" == N ] ; then
+				break
+			elif [ "$input" == s ] || [ "$input" == S ] ; then
+				mkdir -p $RM_CONFIG/saved_draft
+				cp $TMPDIR/wiki.text $RM_CONFIG/saved_draft/wiki_${wikipage}${extension}.orig
+				cp $TMPDIR/wiki.text.updated${extension} $RM_CONFIG/saved_draft/wiki_${wikipage}${extension}
+				cp $TMPDIR/wiki.updated_on $RM_CONFIG/saved_draft/wiki_${wikipage}${extension}.before_edit
 				break
 			else
 				true # edit again
