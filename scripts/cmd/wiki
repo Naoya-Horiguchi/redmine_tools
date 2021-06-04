@@ -97,7 +97,8 @@ update_wiki_page() {
 	else
 		curl -sk $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json?key=${RM_KEY} > $TMPDIR/wiki.json || exit 1
 		jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text
-		jq -r .wiki_page.text $TMPDIR/wiki.json | sed "s/\r//g" > $TMPDIR/wiki.text.updated${extension}
+		echo "@@@ NOTE @@@ LINES BELOW THIS LINE ARE CONSIDERRED AS NOTES" >> $TMPDIR/wiki.text
+		cp $TMPDIR/wiki.text $TMPDIR/wiki.text.updated${extension}
 		jq -r .wiki_page.updated_on $TMPDIR/wiki.json > $TMPDIR/wiki.updated_on
 	fi
 	while true ; do
@@ -116,7 +117,10 @@ update_wiki_page() {
 
 					uploadjson=$TMPDIR/wiki.upload.json
 					echo "{\"wiki_page\": {}}" > $uploadjson
-					json_add_text $uploadjson .wiki_page.text "$(cat $TMPDIR/wiki.text.updated${extension})" || return 1
+					awk '/^@@@ NOTE @@@/{p=1;next}{if(!p){print}}' $TMPDIR/wiki.text.updated${extension} > $TMPDIR/body
+					awk '/^@@@ NOTE @@@/{p=1;next}{if(p){print}}' $TMPDIR/wiki.text.updated${extension} > $TMPDIR/note
+					json_add_text $uploadjson .wiki_page.text "$(cat $TMPDIR/body)" || return 1
+					json_add_text $uploadjson .wiki_page.comments "$(cat $TMPDIR/note)" || return 1
 					curl ${INSECURE:+-k} -s -H "Content-Type: application/json" -X PUT --data-binary "@${uploadjson}" -H "X-Redmine-API-Key: $RM_KEY" $RM_BASEURL/projects/${pjidentifier}/wiki/${wikipage}.json || return 1
 				else
 					echo "conflict detected, please try again with $TMPDIR/wiki.text.diff"
