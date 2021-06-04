@@ -199,8 +199,10 @@ __update_ticket() {
 			# duedate が既に設定されているとき、チケットクローズ時に duedate を
 			# クローズ日に設定する。期日前に完了したとき、duedate が未来日になっていると
 			# 後続のタスクの予定設定に支障をきたすので。
+			# 既にクローズされているチケットを更新されたときは duedate を変更しない。
 			if [ "$RM_RULE_SET_DUEDATE_TODAY_ON_CLOSE" ] ; then
-				if status_closed "$status" ; then
+				local before_status=$(jq -r ".issues[].status.name" $TMPDIR/tmp.before_edit 2> /dev/null)
+				if [ "$status" != "$before_status" ] && status_closed "$status" ; then
 					due_date=0
 				fi
 			fi
